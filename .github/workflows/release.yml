@@ -43,8 +43,11 @@ jobs:
           echo "=== Binary details ==="
           file target/release/loka-stratum
 
-      - name: Upload binary
-        uses: actions/upload-artifact@v4
+      - name: Create release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
         with:
-          name: loka-stratum
-          path: target/release/loka-stratum
+          files: target/release/loka-stratum
+          draft: false
+          prerelease: false
+          generate_release_notes: true
