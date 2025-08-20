@@ -1,0 +1,25 @@
+[server]
+bind_address = "0.0.0.0:3333"
+max_connections = 1000
+
+[server.idle_timeout]
+secs = 300
+nanos = 0
+
+[pool]
+address = "130.211.20.161:9200"
+name = "nicehash"
+username = "37vuX2XMqtcrobGwxSZJSwJoYyjiH18SiQ"
+separator = [".", "_"]
+extranonce = false
+
+[limiter]
+connections = 1000
+
+[limiter.jobs]
+secs = 600
+nanos = 0
+
+[limiter.submissions]
+secs = 172800
+nanos = 0

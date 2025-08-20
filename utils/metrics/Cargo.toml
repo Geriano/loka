@@ -1,0 +1,30 @@
+[package]
+name = "loka-metrics"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lib]
+path = "src/lib.rs"
+crate-type = ["lib", "staticlib"]
+
+[features]
+default = []
+collector = ["dep:tokio"]
+
+[dependencies]
+dashmap = { workspace = true }
+metrics = { workspace = true }
+tracing = { workspace = true }
+tokio = { workspace = true, optional = true }
+
+[dev-dependencies]
+criterion = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+[[bench]]
+name = "recorder_benchmark"
+harness = false
+
+[lints]
+workspace = true

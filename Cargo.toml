@@ -1,0 +1,46 @@
+[workspace]
+resolver = "3"
+members = ["stratum", "utils/metrics"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+authors = ["Geriano <geriano@nusantara.network>"]
+description = "Loka mining proxy and utilities"
+license = "MIT"
+repository = "https://github.com/geriano/loka"
+
+[workspace.dependencies]
+anyhow = "1.0.99"
+axum = { version = "0.8.4", features = ["ws", "http2"] }
+async-trait = "0.1.68"
+clap = { version = "4.5.45", features = ["derive"] }
+chrono = { version = "0.4.41", features = ["serde"] }
+criterion = "0.7.0"
+dashmap = "6.1.0"
+dotenvy = { version = "0.15.7", features = ["cli", "clap"] }
+metrics = "0.24.2"
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+thiserror = "2.0.16"
+tokio = { version = "1.47.1", features = ["full"] }
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.143"
+toml = "0.8.20"
+utoipa = { version = "5.4.0", features = ["url", "uuid", "yaml", "time", "smallvec", "axum_extras"] }
+utoipa-axum = "0.2.0"
+utoipa-swagger-ui = { version = "9.0.2", features = ["axum"] }
+futures = { version = "0.3", default-features = false, features = ["async-await"] }
+uuid = { version = "1.0", features = ["v4", "serde"] }
+tower = { version = "0.5.2", features = ["full", "tokio", "tracing"] }
+tower-http = { version = "0.6.6", features = ["cors", "full", "tokio", "tracing", "uuid"] }
+hyper = { version = "1.7", features = ["http1", "http2"] }
+regex = "1.10"
+sysinfo = "0.32"
+
+[workspace.dependencies.loka-metrics]
+path = "utils/metrics"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"

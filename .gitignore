@@ -1,0 +1,7 @@
+.cargo
+.DS_Stores
+.DS_Store
+/target
+/logs
+.env
+*.logs*
