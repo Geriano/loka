@@ -1,0 +1,36 @@
+# Docker-specific configuration for Loka Stratum
+# This configuration is optimized for containerized deployment
+
+[server]
+bind = "0.0.0.0:3333"
+pool_address = "${POOL_ADDRESS}"
+max_connections = "${LOKA_MAX_CONNECTIONS:-1000}"
+connection_timeout = 30
+
+[metrics]
+enabled = true
+bind = "0.0.0.0:9090"
+interval = "${LOKA_METRICS_INTERVAL:-5}"
+export_format = "both"
+
+[logging]
+level = "${RUST_LOG:-info}"
+format = "json"
+structured = true
+
+[performance]
+worker_threads = "${LOKA_WORKER_THREADS:-8}"
+string_pool_size = 10000
+cache_ttl = 300
+cache_max_size = 1000
+
+[security]
+rate_limit = "${LOKA_RATE_LIMIT:-100}"
+enable_cors = "${LOKA_ENABLE_CORS:-true}"
+ip_filter_mode = "none"
+
+[monitoring]
+health_check_interval = 30
+cpu_threshold = 80.0
+memory_threshold = 80.0
+error_rate_threshold = 10.0

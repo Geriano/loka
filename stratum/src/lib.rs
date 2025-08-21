@@ -2,13 +2,21 @@
 pub mod config;
 pub mod error;
 pub mod network;
-pub(crate) mod protocol;
-pub(crate) mod services;
+pub mod protocol;
+pub mod services;
 // storage: Future storage abstraction layer
-pub(crate) mod utils;
+pub mod utils;
 
 // CLI interface
 pub mod cli;
+
+// Mock pool for testing
+#[cfg(feature = "mock-pool")]
+pub mod mock;
+
+// Mock miner for testing
+#[cfg(feature = "mock-miner")]
+pub mod miner;
 
 // Core modules
 pub mod auth;

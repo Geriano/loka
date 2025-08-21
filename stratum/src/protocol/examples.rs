@@ -1,15 +1,28 @@
 use crate::error::Result;
 use crate::protocol::pipeline::{MessageContext, PipelineBuilder};
+use crate::config::types::PoolConfig;
 
 /// Example demonstrating how to create and use a message processing pipeline
 pub async fn example_pipeline_usage() -> Result<()> {
+    // Create a default pool config for the example
+    let pool_config = PoolConfig {
+        address: "127.0.0.1:4444".to_string(),
+        name: "example_pool".to_string(),
+        host: None,
+        port: None,
+        username: "example_user".to_string(),
+        password: Some("x".to_string()),
+        separator: (".".to_string(), "_".to_string()),
+        extranonce: false,
+    };
+
     // Create a pipeline with multiple middleware layers
     let pipeline = PipelineBuilder::new()
         .with_logging()           // Log all messages
         .with_parsing()           // Parse raw messages into StratumMessage
         .with_validation()        // Validate parsed messages
         .with_rate_limiting(60)   // Allow max 60 requests per minute
-        .with_authentication()    // Handle authentication
+        .with_authentication(pool_config)    // Handle authentication
         .build();
 
     // Example raw Stratum message

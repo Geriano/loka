@@ -9,6 +9,7 @@ use crate::error::{Result, StratumError};
 use crate::protocol::messages::StratumMessage;
 use crate::protocol::parser::StratumParser;
 use crate::protocol::pipeline::{MessageContext, Middleware};
+use crate::config::types::PoolConfig;
 
 /// Middleware for parsing raw messages into StratumMessage
 #[derive(Debug)]
@@ -205,19 +206,46 @@ impl Middleware for RateLimitingMiddleware {
 #[derive(Debug)]
 pub struct AuthenticationMiddleware {
     authenticated_clients: DashMap<String, bool>,
+    pool_config: PoolConfig,
 }
 
 impl AuthenticationMiddleware {
-    pub fn new() -> Self {
+    pub fn new(pool_config: PoolConfig) -> Self {
         Self {
             authenticated_clients: DashMap::new(),
+            pool_config,
         }
+    }
+
+    /// Transform miner username to pool-compatible format
+    /// Converts "john.test" to "37vuX2XMqtcrobGwxSZJSwJoYyjiH18SiQ.john_test"
+    fn transform_username(&self, user: &str, worker: &str) -> String {
+        let (from_separator, to_separator) = &self.pool_config.separator;
+        
+        // Combine user and worker to create the full miner identifier
+        let full_miner_username = format!("{}.{}", user, worker);
+        
+        // Transform the miner username: replace dots with underscores (or configured separator)
+        let transformed_worker = full_miner_username.replace(from_separator, to_separator);
+        
+        // Combine pool username with transformed miner username
+        format!("{}.{}", self.pool_config.username, transformed_worker)
     }
 }
 
 impl Default for AuthenticationMiddleware {
     fn default() -> Self {
-        Self::new()
+        // Use default pool config when no config is provided
+        Self::new(PoolConfig {
+            address: "127.0.0.1:4444".to_string(),
+            name: "default".to_string(),
+            host: None,
+            port: None,
+            username: "default_user".to_string(),
+            password: None,
+            separator: (".".to_string(), "_".to_string()),
+            extranonce: false,
+        })
     }
 }
 
@@ -231,13 +259,17 @@ impl Middleware for AuthenticationMiddleware {
                     let user_clone = user.clone();
                     let worker_clone = worker.clone();
                     
+                    // Transform username to pool-compatible format
+                    let pool_username = self.transform_username(user, worker);
+                    
                     // Simple authentication - accept all for now
                     // TODO: Add actual authentication logic
                     self.authenticated_clients.insert(client_key.clone(), true);
                     context.set_metadata("authenticated".to_string(), "true".to_string());
                     context.set_metadata("auth_key".to_string(), client_key);
+                    context.set_metadata("pool_username".to_string(), pool_username.clone());
                     
-                    info!("Client authenticated: {}:{}", user_clone, worker_clone);
+                    info!("Client authenticated: {}.{} (pool format: {})", user_clone, worker_clone, pool_username);
                 }
                 StratumMessage::Subscribe { .. } => {
                     // Subscribe is allowed without authentication (it's the first message miners send)

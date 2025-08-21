@@ -1,0 +1,19 @@
+#[cfg(feature = "mock-miner")]
+pub mod client;
+#[cfg(feature = "mock-miner")]
+pub mod config;
+#[cfg(feature = "mock-miner")]
+pub mod hashrate;
+#[cfg(feature = "mock-miner")]
+pub mod worker;
+#[cfg(feature = "mock-miner")]
+pub mod messages;
+#[cfg(feature = "mock-miner")]
+pub mod simulator;
+
+#[cfg(feature = "mock-miner")]
+pub use client::MockMiner;
+#[cfg(feature = "mock-miner")]
+pub use config::MinerConfig;
+#[cfg(feature = "mock-miner")]
+pub use simulator::MinerSimulator;

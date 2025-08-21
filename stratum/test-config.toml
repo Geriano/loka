@@ -1,0 +1,11 @@
+[server]
+bind = "0.0.0.0:3333"
+pool_address = "test.pool.com:4444"
+
+[limits]
+max_connections = 1000
+idle_timeout = 300
+
+[metrics]
+enabled = true
+bind = "127.0.0.1:9090"

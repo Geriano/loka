@@ -1,0 +1,144 @@
+groups:
+  - name: loka-stratum.rules
+    interval: 30s
+    rules:
+      # Connection metrics
+      - record: loka:connection_rate
+        expr: rate(loka_connections_total[5m])
+      
+      - record: loka:active_connections
+        expr: loka_connections_active
+      
+      - record: loka:connection_success_rate
+        expr: rate(loka_connections_successful[5m]) / rate(loka_connections_total[5m])
+
+      # Mining metrics
+      - record: loka:shares_per_second
+        expr: rate(loka_shares_submitted[5m])
+      
+      - record: loka:share_acceptance_rate
+        expr: rate(loka_shares_accepted[5m]) / rate(loka_shares_submitted[5m])
+      
+      - record: loka:hashrate_estimate
+        expr: avg(loka_hashrate_estimate_gh_per_s)
+
+      # Performance metrics
+      - record: loka:message_processing_rate
+        expr: rate(loka_messages_processed[5m])
+      
+      - record: loka:avg_message_processing_time
+        expr: avg(loka_message_processing_duration_seconds)
+      
+      - record: loka:error_rate
+        expr: rate(loka_errors_total[5m])
+
+      # System health metrics
+      - record: loka:memory_usage_ratio
+        expr: loka_memory_usage_bytes / loka_memory_limit_bytes
+      
+      - record: loka:cpu_usage_percent
+        expr: rate(loka_cpu_time_seconds[5m]) * 100
+
+  - name: loka-stratum.alerts
+    rules:
+      # Critical alerts
+      - alert: LokaStratumDown
+        expr: up{job="loka-stratum"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: loka-stratum
+        annotations:
+          summary: "Loka Stratum is down"
+          description: "Loka Stratum has been down for more than 1 minute"
+
+      - alert: HighErrorRate
+        expr: loka:error_rate > 10
+        for: 2m
+        labels:
+          severity: critical
+          service: loka-stratum
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value }} errors/second for 2 minutes"
+
+      - alert: LowShareAcceptanceRate
+        expr: loka:share_acceptance_rate < 0.9
+        for: 5m
+        labels:
+          severity: warning
+          service: loka-stratum
+        annotations:
+          summary: "Low share acceptance rate"
+          description: "Share acceptance rate is {{ $value | humanizePercentage }} for 5 minutes"
+
+      # Performance alerts
+      - alert: HighMemoryUsage
+        expr: loka:memory_usage_ratio > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: loka-stratum
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is {{ $value | humanizePercentage }} for 5 minutes"
+
+      - alert: HighCPUUsage
+        expr: loka:cpu_usage_percent > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: loka-stratum
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is {{ $value }}% for 5 minutes"
+
+      - alert: SlowMessageProcessing
+        expr: loka:avg_message_processing_time > 0.001
+        for: 3m
+        labels:
+          severity: warning
+          service: loka-stratum
+        annotations:
+          summary: "Slow message processing"
+          description: "Average message processing time is {{ $value }}s for 3 minutes"
+
+      # Business alerts
+      - alert: NoActiveConnections
+        expr: loka:active_connections == 0
+        for: 2m
+        labels:
+          severity: warning
+          service: loka-stratum
+        annotations:
+          summary: "No active mining connections"
+          description: "No miners are currently connected for 2 minutes"
+
+      - alert: LowHashrate
+        expr: loka:hashrate_estimate < 1
+        for: 10m
+        labels:
+          severity: info
+          service: loka-stratum
+        annotations:
+          summary: "Low network hashrate"
+          description: "Estimated hashrate is {{ $value }} GH/s for 10 minutes"
+
+      # Infrastructure alerts
+      - alert: PrometheusTargetDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Prometheus target down"
+          description: "{{ $labels.job }} target has been down for 1 minute"
+
+      - alert: HighDiskUsage
+        expr: (node_filesystem_size_bytes - node_filesystem_free_bytes) / node_filesystem_size_bytes > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High disk usage"
+          description: "Disk usage is {{ $value | humanizePercentage }} on {{ $labels.instance }}"

@@ -5,6 +5,7 @@ use async_trait::async_trait;
 
 use crate::error::Result;
 use crate::protocol::messages::StratumMessage;
+use crate::config::types::PoolConfig;
 
 /// Context passed through the middleware pipeline
 #[derive(Debug, Clone)]
@@ -119,8 +120,8 @@ impl PipelineBuilder {
         self.add_middleware(crate::protocol::middleware::RateLimitingMiddleware::new(max_requests_per_minute))
     }
 
-    pub fn with_authentication(self) -> Self {
-        self.add_middleware(crate::protocol::middleware::AuthenticationMiddleware::new())
+    pub fn with_authentication(self, pool_config: PoolConfig) -> Self {
+        self.add_middleware(crate::protocol::middleware::AuthenticationMiddleware::new(pool_config))
     }
 
     pub fn with_logging(self) -> Self {

@@ -39,7 +39,7 @@ impl ProtocolHandler {
             .with_parsing()           // Parse raw messages
             .with_validation()        // Validate messages
             .with_rate_limiting(60)   // Rate limit clients
-            .with_authentication()    // Handle authentication
+            .with_authentication(config.pool.clone())    // Handle authentication with pool config
             .build();
 
         Self {

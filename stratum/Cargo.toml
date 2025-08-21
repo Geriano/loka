@@ -8,6 +8,11 @@ rust-version.workspace = true
 name = "loka-stratum"
 path = "bin/main.rs"
 
+[features]
+default = []
+mock-pool = ["rand", "hex"]
+mock-miner = ["rand", "hex"]
+
 [dependencies]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
@@ -34,12 +39,19 @@ utoipa-axum = { workspace = true }
 utoipa-swagger-ui = { workspace = true }
 regex = { workspace = true }
 sysinfo = { workspace = true }
+rand = { version = "0.8", optional = true }
+hex = { version = "0.4", optional = true }
 
 [dependencies.loka-metrics]
 workspace = true
 
 [dev-dependencies]
 criterion = { workspace = true }
+tokio-test = "0.4"
+
+[[bench]]
+name = "critical_path"
+harness = false
 
 [lints]
 workspace = true
