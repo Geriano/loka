@@ -106,6 +106,7 @@ impl AtomicMetrics {
     }
 
     // Helper methods for atomic float operations
+    #[allow(unused)]
     fn store_f64(&self, atomic: &AtomicU64, value: f64) {
         atomic.store(value.to_bits(), Ordering::Relaxed);
     }

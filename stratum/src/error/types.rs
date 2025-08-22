@@ -1,178 +1,178 @@
+use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use thiserror::Error;
-use serde::{Deserialize, Serialize};
 
 /// Comprehensive error types for the Stratum proxy system
 #[derive(Error, Debug)]
 pub enum StratumError {
     // Network-related errors
     #[error("Network error: {message}")]
-    Network { 
+    Network {
         message: String,
         #[source]
         source: Option<Box<StratumError>>,
     },
-    
+
     #[error("Connection error: {message}")]
-    Connection { 
+    Connection {
         message: String,
         remote_addr: Option<std::net::SocketAddr>,
     },
-    
+
     #[error("Connection limit exceeded: {current}/{max}")]
     ConnectionLimitExceeded { current: usize, max: usize },
-    
+
     #[error("Connection timeout: {timeout:?}")]
     ConnectionTimeout { timeout: Duration },
-    
+
     // Protocol-related errors
     #[error("Protocol error: {message}")]
-    Protocol { 
+    Protocol {
         message: String,
         method: Option<String>,
         request_id: Option<i64>,
     },
-    
+
     #[error("Invalid message format: {message}")]
-    InvalidMessageFormat { 
+    InvalidMessageFormat {
         message: String,
         raw_data: Option<String>,
     },
-    
+
     #[error("Unsupported protocol version: {version}")]
     UnsupportedProtocolVersion { version: String },
-    
+
     #[error("Message too large: {size} bytes (max: {max_size} bytes)")]
     MessageTooLarge { size: usize, max_size: usize },
-    
+
     // Authentication-related errors
     #[error("Authentication failed: {reason}")]
-    Authentication { 
+    Authentication {
         reason: String,
         username: Option<String>,
         remote_addr: Option<std::net::SocketAddr>,
     },
-    
+
     #[error("Authorization failed: insufficient permissions")]
-    Authorization { 
+    Authorization {
         required_permission: String,
         current_permissions: Vec<String>,
     },
-    
+
     #[error("Session expired for user: {username}")]
-    SessionExpired { 
+    SessionExpired {
         username: String,
         expired_at: chrono::DateTime<chrono::Utc>,
     },
-    
+
     #[error("Invalid credentials format")]
     InvalidCredentials,
-    
+
     // Job-related errors
     #[error("Job error: {message}")]
-    Job { 
+    Job {
         message: String,
         job_id: Option<String>,
     },
-    
+
     #[error("Job not found: {job_id}")]
     JobNotFound { job_id: String },
-    
+
     #[error("Job expired: {job_id} (expired at: {expired_at})")]
-    JobExpired { 
+    JobExpired {
         job_id: String,
         expired_at: chrono::DateTime<chrono::Utc>,
     },
-    
+
     #[error("Invalid job parameters: {message}")]
     InvalidJobParameters { message: String },
-    
+
     // Submission-related errors
     #[error("Submission error: {message}")]
-    Submission { 
+    Submission {
         message: String,
         submission_id: Option<String>,
         job_id: Option<String>,
     },
-    
+
     #[error("Duplicate submission: {submission_id}")]
     DuplicateSubmission { submission_id: String },
-    
+
     #[error("Submission rejected: {reason}")]
-    SubmissionRejected { 
+    SubmissionRejected {
         reason: String,
         submission_id: String,
         job_id: String,
     },
-    
+
     #[error("Invalid share: {message}")]
-    InvalidShare { 
+    InvalidShare {
         message: String,
         difficulty: Option<u64>,
     },
-    
+
     // Storage-related errors
     #[error("Storage error: {message}")]
-    Storage { 
+    Storage {
         message: String,
         operation: Option<String>,
     },
-    
+
     #[error("Storage capacity exceeded: {current}/{max}")]
     StorageCapacityExceeded { current: usize, max: usize },
-    
+
     #[error("Data corruption detected: {message}")]
     DataCorruption { message: String },
-    
+
     // Rate limiting and security errors
     #[error("Rate limit exceeded: {limit} requests per {window:?}")]
-    RateLimitExceeded { 
+    RateLimitExceeded {
         limit: u64,
         window: Duration,
         retry_after: Duration,
     },
-    
+
     #[error("Security violation: {message}")]
-    SecurityViolation { 
+    SecurityViolation {
         message: String,
         severity: SecuritySeverity,
     },
-    
+
     #[error("Validation failed: {field} - {message}")]
-    ValidationFailed { 
+    ValidationFailed {
         field: String,
         message: String,
         value: Option<String>,
     },
-    
+
     // Configuration errors
     #[error("Configuration error: {0}")]
     Config(#[from] ConfigError),
-    
+
     // External service errors
     #[error("JSON parsing error: {message}")]
     JsonParsing { message: String },
-    
+
     #[error("Internal error: {message}")]
     Internal { message: String },
-    
+
     // Task management errors
     #[error("Task error: {message}")]
-    Task { 
+    Task {
         message: String,
         task_id: Option<String>,
     },
-    
+
     #[error("Task timeout: {timeout:?}")]
     TaskTimeout { timeout: Duration },
-    
+
     #[error("Task cancelled: {task_id}")]
     TaskCancelled { task_id: String },
-    
+
     // Resource management errors
     #[error("Resource exhausted: {resource}")]
     ResourceExhausted { resource: String },
-    
+
     #[error("Resource unavailable: {resource}")]
     ResourceUnavailable { resource: String },
 }
@@ -202,49 +202,40 @@ impl std::fmt::Display for SecuritySeverity {
 pub enum ConfigError {
     #[error("Invalid port: {port} (must be between 1 and 65535)")]
     InvalidPort { port: u16 },
-    
+
     #[error("Invalid connection limit: {limit} (must be > 0)")]
     InvalidConnectionLimit { limit: usize },
-    
+
     #[error("Invalid duration: {field} = {duration:?} (must be > 0)")]
-    InvalidDuration { 
-        field: String,
-        duration: Duration,
-    },
-    
+    InvalidDuration { field: String, duration: Duration },
+
     #[error("Missing required field: {field}")]
     MissingField { field: String },
-    
+
     #[error("Invalid configuration format: {message}")]
     InvalidFormat { message: String },
-    
+
     #[error("Configuration file not found: {path}")]
     FileNotFound { path: String },
-    
+
     #[error("Permission denied accessing config file: {path}")]
     PermissionDenied { path: String },
-    
+
     #[error("Environment variable error: {variable} - {message}")]
-    EnvironmentVariable { 
-        variable: String,
-        message: String,
-    },
-    
+    EnvironmentVariable { variable: String, message: String },
+
     #[error("Configuration validation failed: {message}")]
     ValidationFailed { message: String },
-    
+
     #[error("Incompatible configuration version: {version} (expected: {expected})")]
-    IncompatibleVersion { 
-        version: String,
-        expected: String,
-    },
+    IncompatibleVersion { version: String, expected: String },
 }
 
 /// Error action recommendations for error recovery
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ErrorAction {
     /// Retry the operation with exponential backoff
-    Retry { 
+    Retry {
         max_attempts: u32,
         base_delay: Duration,
         max_delay: Duration,
@@ -258,10 +249,7 @@ pub enum ErrorAction {
     /// Fallback to a default behavior
     Fallback { message: String },
     /// Circuit breaker - temporarily disable functionality
-    CircuitBreaker { 
-        duration: Duration,
-        message: String,
-    },
+    CircuitBreaker { duration: Duration, message: String },
 }
 
 impl StratumError {
@@ -272,65 +260,70 @@ impl StratumError {
             source: None,
         }
     }
-    
+
     /// Create a JSON parsing error
     pub fn from_json_error(err: serde_json::Error) -> Self {
         StratumError::JsonParsing {
             message: err.to_string(),
         }
     }
-    
+
     /// Create an internal error from any error type
-    pub fn from_internal<E>(err: E) -> Self 
-    where 
+    pub fn from_internal<E>(err: E) -> Self
+    where
         E: std::error::Error + Send + Sync + 'static,
     {
         StratumError::Internal {
             message: err.to_string(),
         }
     }
-    
+
     /// Check if this error is retryable
     pub fn is_retryable(&self) -> bool {
-        matches!(self, 
-            StratumError::Network { .. } |
-            StratumError::ConnectionTimeout { .. } |
-            StratumError::Storage { .. } |
-            StratumError::TaskTimeout { .. } |
-            StratumError::ResourceUnavailable { .. }
+        matches!(
+            self,
+            StratumError::Network { .. }
+                | StratumError::ConnectionTimeout { .. }
+                | StratumError::Storage { .. }
+                | StratumError::TaskTimeout { .. }
+                | StratumError::ResourceUnavailable { .. }
         )
     }
-    
+
     /// Check if this error is recoverable
     pub fn is_recoverable(&self) -> bool {
-        !matches!(self,
-            StratumError::Config(_) |
-            StratumError::SecurityViolation { .. } |
-            StratumError::DataCorruption { .. } |
-            StratumError::InvalidCredentials |
-            StratumError::UnsupportedProtocolVersion { .. }
+        !matches!(
+            self,
+            StratumError::Config(_)
+                | StratumError::SecurityViolation { .. }
+                | StratumError::DataCorruption { .. }
+                | StratumError::InvalidCredentials
+                | StratumError::UnsupportedProtocolVersion { .. }
         )
     }
-    
+
     /// Get the severity level of this error
     pub fn severity(&self) -> ErrorSeverity {
         match self {
-            StratumError::SecurityViolation { severity: SecuritySeverity::Critical, .. } |
-            StratumError::DataCorruption { .. } => ErrorSeverity::Critical,
-            
-            StratumError::SecurityViolation { .. } |
-            StratumError::ConnectionLimitExceeded { .. } |
-            StratumError::StorageCapacityExceeded { .. } => ErrorSeverity::High,
-            
-            StratumError::Authentication { .. } |
-            StratumError::Authorization { .. } |
-            StratumError::RateLimitExceeded { .. } |
-            StratumError::ValidationFailed { .. } => ErrorSeverity::Medium,
-            
+            StratumError::SecurityViolation {
+                severity: SecuritySeverity::Critical,
+                ..
+            }
+            | StratumError::DataCorruption { .. } => ErrorSeverity::Critical,
+
+            StratumError::SecurityViolation { .. }
+            | StratumError::ConnectionLimitExceeded { .. }
+            | StratumError::StorageCapacityExceeded { .. } => ErrorSeverity::High,
+
+            StratumError::Authentication { .. }
+            | StratumError::Authorization { .. }
+            | StratumError::RateLimitExceeded { .. }
+            | StratumError::ValidationFailed { .. } => ErrorSeverity::Medium,
+
             _ => ErrorSeverity::Low,
         }
     }
-    
+
     /// Get recommended error action
     pub fn recommended_action(&self) -> ErrorAction {
         match self {
@@ -340,31 +333,29 @@ impl StratumError {
                 base_delay: Duration::from_millis(100),
                 max_delay: Duration::from_secs(5),
             },
-            
+
             StratumError::ConnectionTimeout { .. } => ErrorAction::Retry {
                 max_attempts: 2,
                 base_delay: Duration::from_millis(500),
                 max_delay: Duration::from_secs(2),
             },
-            
+
             // Terminable errors
-            StratumError::SecurityViolation { .. } |
-            StratumError::ConnectionLimitExceeded { .. } => ErrorAction::Terminate,
-            
+            StratumError::SecurityViolation { .. }
+            | StratumError::ConnectionLimitExceeded { .. } => ErrorAction::Terminate,
+
             // Rate limiting
-            StratumError::RateLimitExceeded { retry_after, .. } => {
-                ErrorAction::CircuitBreaker {
-                    duration: *retry_after,
-                    message: "Rate limit exceeded".to_string(),
-                }
+            StratumError::RateLimitExceeded { retry_after, .. } => ErrorAction::CircuitBreaker {
+                duration: *retry_after,
+                message: "Rate limit exceeded".to_string(),
             },
-            
+
             // Validation errors can be escalated
             StratumError::ValidationFailed { .. } => ErrorAction::Escalate,
-            
+
             // Configuration errors are not recoverable
             StratumError::Config(_) => ErrorAction::Terminate,
-            
+
             // Default to retry for most other errors
             _ => ErrorAction::Retry {
                 max_attempts: 1,
@@ -373,7 +364,7 @@ impl StratumError {
             },
         }
     }
-    
+
     /// Create a context-aware error with additional information
     pub fn with_context(self, context: &str) -> Self {
         match self {

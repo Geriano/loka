@@ -1,6 +1,6 @@
-use crate::protocol::types::{Method, Request};
-use crate::protocol::messages::StratumMessage;
 use crate::error::Result;
+use crate::protocol::messages::StratumMessage;
+use crate::protocol::types::{Method, Request};
 
 #[derive(Debug, Default, Clone)]
 pub struct StratumParser;
@@ -9,7 +9,7 @@ impl StratumParser {
     pub fn new() -> Self {
         Self
     }
-    
+
     pub fn parse_message(&self, line: &str) -> Result<Option<StratumMessage>> {
         if let Ok(request) = serde_json::from_str::<Request>(line) {
             let parsed = match request.method {
@@ -30,7 +30,10 @@ impl StratumParser {
     fn handle_subscribe(&self, request: Request) -> Result<StratumMessage> {
         let user_agent = if let Some(params) = request.params {
             if let Some(params) = params.as_array() {
-                params.get(0).and_then(|param| param.as_str()).map(|s| s.to_string())
+                params
+                    .get(0)
+                    .and_then(|param| param.as_str())
+                    .map(|s| s.to_string())
             } else {
                 None
             }
@@ -43,7 +46,7 @@ impl StratumParser {
             user_agent,
         })
     }
-    
+
     fn handle_set_difficulty(&self, request: Request) -> Result<StratumMessage> {
         if let Some(params) = request.params {
             if let Some(params) = params.as_array() {
@@ -52,7 +55,7 @@ impl StratumParser {
                 }
             }
         }
-        
+
         Err(crate::error::StratumError::Protocol {
             message: "Invalid set_difficulty parameters".to_string(),
             method: Some("mining.set_difficulty".to_string()),
@@ -71,7 +74,7 @@ impl StratumParser {
 
                 if let Some(Some(cred)) = params.get(0).map(|param| param.as_str()) {
                     let (user, worker) = self.parse_credentials(cred)?;
-                    
+
                     return Ok(StratumMessage::Authenticate {
                         id: request.id.unwrap_or(999),
                         user,
@@ -125,23 +128,17 @@ impl StratumParser {
             request_id: None,
         })
     }
-    
+
     fn parse_credentials(&self, cred: &str) -> Result<(String, String)> {
         let cred = cred.trim().to_lowercase();
 
         if let Some((user, worker)) = cred.split_once('.') {
-            Ok((
-                user.to_owned(),
-                self.clean_worker_name(worker),
-            ))
+            Ok((user.to_owned(), self.clean_worker_name(worker)))
         } else {
-            Ok((
-                self.clean_worker_name(&cred),
-                "default".to_owned(),
-            ))
+            Ok((self.clean_worker_name(&cred), "default".to_owned()))
         }
     }
-    
+
     fn clean_worker_name(&self, worker: &str) -> String {
         worker.replace(".", "").replace("-", "").replace("_", "")
     }

@@ -8,6 +8,7 @@ pub struct Submit {
     rejected: AtomicU64,
 }
 
+#[allow(dead_code)]
 impl Submit {
     pub fn new() -> Self {
         Self {

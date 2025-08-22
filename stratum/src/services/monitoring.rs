@@ -1,17 +1,17 @@
-use std::collections::HashMap;
 use dashmap::DashMap;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::collections::HashMap;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
-use tokio::sync::{broadcast, RwLock};
+use tokio::sync::{RwLock, broadcast};
 use tokio::time::interval;
 use tracing::{error, info, warn};
 
 use crate::error::{Result, StratumError};
 use crate::services::metrics::AtomicMetrics;
 use crate::services::performance::SystemMetrics;
-use crate::services::performance::{ResourceMonitor, PerformanceProfiler};
+use crate::services::performance::{PerformanceProfiler, ResourceMonitor};
 
 /// Performance monitoring and alerting service
 pub struct MonitoringService {
@@ -19,15 +19,16 @@ pub struct MonitoringService {
     metrics: Arc<AtomicMetrics>,
     resource_monitor: Arc<ResourceMonitor>,
     performance_profiler: Arc<PerformanceProfiler>,
-    
+
     /// Alert configuration
+    #[allow(dead_code)]
     alert_config: AlertConfig,
     alert_sender: broadcast::Sender<Alert>,
-    
+
     /// Monitoring state
     is_running: Arc<AtomicBool>,
     monitoring_tasks: Arc<RwLock<Vec<tokio::task::JoinHandle<()>>>>,
-    
+
     /// Thresholds and rules
     alert_rules: Arc<RwLock<Vec<AlertRule>>>,
     threshold_breaches: Arc<DashMap<String, ThresholdBreach>>,
@@ -41,7 +42,7 @@ impl MonitoringService {
         performance_profiler: Arc<PerformanceProfiler>,
     ) -> Self {
         let (alert_sender, _) = broadcast::channel(1000);
-        
+
         Self {
             metrics,
             resource_monitor,
@@ -68,21 +69,23 @@ impl MonitoringService {
 
         // Start monitoring tasks
         let mut tasks = self.monitoring_tasks.write().await;
-        
+
         // Resource monitoring task
         tasks.push(self.spawn_resource_monitoring());
-        
-        // Performance monitoring task  
+
+        // Performance monitoring task
         tasks.push(self.spawn_performance_monitoring());
-        
+
         // Alert processing task
         tasks.push(self.spawn_alert_processing());
-        
+
         // Health check task
         tasks.push(self.spawn_health_check());
 
-        info!("Performance monitoring service started with {} alert rules", 
-              self.alert_rules.read().await.len());
+        info!(
+            "Performance monitoring service started with {} alert rules",
+            self.alert_rules.read().await.len()
+        );
         Ok(())
     }
 
@@ -128,7 +131,10 @@ impl MonitoringService {
 
     /// Get performance report
     pub async fn get_performance_report(&self) -> PerformanceReport {
-        let system_metrics = self.resource_monitor.update_metrics().await
+        let system_metrics = self
+            .resource_monitor
+            .update_metrics()
+            .await
             .unwrap_or_else(|_| SystemMetrics {
                 cpu_usage: 0.0,
                 memory_used: 0,
@@ -163,7 +169,6 @@ impl MonitoringService {
                 cooldown: Duration::from_secs(300),
                 enabled: true,
             },
-            
             // Memory usage alert
             AlertRule {
                 id: "memory_high".to_string(),
@@ -174,7 +179,6 @@ impl MonitoringService {
                 cooldown: Duration::from_secs(300),
                 enabled: true,
             },
-            
             // Connection rate alert
             AlertRule {
                 id: "connection_rate_high".to_string(),
@@ -185,7 +189,6 @@ impl MonitoringService {
                 cooldown: Duration::from_secs(120),
                 enabled: true,
             },
-            
             // Error rate alert
             AlertRule {
                 id: "error_rate_high".to_string(),
@@ -212,19 +215,21 @@ impl MonitoringService {
 
         tokio::spawn(async move {
             let mut interval = interval(Duration::from_secs(30));
-            
+
             while is_running.load(Ordering::SeqCst) {
                 interval.tick().await;
-                
+
                 if let Ok(system_metrics) = resource_monitor.update_metrics().await {
                     let rules = alert_rules.read().await;
-                    
+
                     for rule in rules.iter() {
                         if !rule.enabled {
                             continue;
                         }
-                        
-                        if let Some(alert) = Self::check_system_alert_condition(rule, &system_metrics).await {
+
+                        if let Some(alert) =
+                            Self::check_system_alert_condition(rule, &system_metrics).await
+                        {
                             if Self::should_fire_alert(rule, &threshold_breaches).await {
                                 let _ = alert_sender.send(alert);
                                 Self::record_threshold_breach(rule, &threshold_breaches).await;
@@ -244,15 +249,16 @@ impl MonitoringService {
 
         tokio::spawn(async move {
             let mut interval = interval(Duration::from_secs(60));
-            
+
             while is_running.load(Ordering::SeqCst) {
                 interval.tick().await;
-                
+
                 let stats = performance_profiler.get_all_stats().await;
-                
+
                 // Check for slow operations
                 for (operation, op_stats) in stats {
-                    if op_stats.p99 > Duration::from_millis(1000) { // 1 second threshold
+                    if op_stats.p99 > Duration::from_millis(1000) {
+                        // 1 second threshold
                         let alert = Alert {
                             id: format!("slow_operation_{}", operation),
                             rule_id: "performance_slow_operation".to_string(),
@@ -267,9 +273,11 @@ impl MonitoringService {
                                 ("operation".to_string(), operation),
                                 ("p99_ms".to_string(), op_stats.p99.as_millis().to_string()),
                                 ("avg_ms".to_string(), op_stats.avg.as_millis().to_string()),
-                            ].into_iter().collect(),
+                            ]
+                            .into_iter()
+                            .collect(),
                         };
-                        
+
                         let _ = alert_sender.send(alert);
                     }
                 }
@@ -305,12 +313,12 @@ impl MonitoringService {
 
         tokio::spawn(async move {
             let mut interval = interval(Duration::from_secs(120)); // Every 2 minutes
-            
+
             while is_running.load(Ordering::SeqCst) {
                 interval.tick().await;
-                
+
                 let health_status = Self::check_application_health(&metrics).await;
-                
+
                 if !health_status.is_healthy {
                     let alert = Alert {
                         id: "health_check_failed".to_string(),
@@ -321,7 +329,7 @@ impl MonitoringService {
                         timestamp: Instant::now(),
                         metadata: HashMap::new(),
                     };
-                    
+
                     let _ = alert_sender.send(alert);
                 }
             }
@@ -345,10 +353,13 @@ impl MonitoringService {
         rule: &AlertRule,
         threshold_breaches: &Arc<DashMap<String, ThresholdBreach>>,
     ) {
-        threshold_breaches.insert(rule.id.clone(), ThresholdBreach {
-            rule_id: rule.id.clone(),
-            timestamp: Instant::now(),
-        });
+        threshold_breaches.insert(
+            rule.id.clone(),
+            ThresholdBreach {
+                rule_id: rule.id.clone(),
+                timestamp: Instant::now(),
+            },
+        );
     }
 
     /// Check system alert conditions
@@ -370,15 +381,21 @@ impl MonitoringService {
                         severity: rule.severity.clone(),
                         timestamp: Instant::now(),
                         metadata: [
-                            ("cpu_usage".to_string(), system_metrics.cpu_usage.to_string()),
+                            (
+                                "cpu_usage".to_string(),
+                                system_metrics.cpu_usage.to_string(),
+                            ),
                             ("threshold".to_string(), threshold.to_string()),
-                        ].iter().cloned().collect(),
+                        ]
+                        .iter()
+                        .cloned()
+                        .collect(),
                     })
                 } else {
                     None
                 }
             }
-            
+
             AlertCondition::MemoryUsage { threshold } => {
                 if system_metrics.memory_usage_percent > *threshold {
                     Some(Alert {
@@ -392,15 +409,21 @@ impl MonitoringService {
                         severity: rule.severity.clone(),
                         timestamp: Instant::now(),
                         metadata: [
-                            ("memory_usage_percent".to_string(), system_metrics.memory_usage_percent.to_string()),
+                            (
+                                "memory_usage_percent".to_string(),
+                                system_metrics.memory_usage_percent.to_string(),
+                            ),
                             ("threshold".to_string(), threshold.to_string()),
-                        ].iter().cloned().collect(),
+                        ]
+                        .iter()
+                        .cloned()
+                        .collect(),
                     })
                 } else {
                     None
                 }
             }
-            
+
             _ => None, // Other conditions handled elsewhere
         }
     }
@@ -418,7 +441,7 @@ impl MonitoringService {
                 info!("INFO: {} - {}", alert.title, alert.description);
             }
         }
-        
+
         // In production, you might:
         // - Send notifications via email/Slack/PagerDuty
         // - Store alerts in database
@@ -430,23 +453,24 @@ impl MonitoringService {
     async fn check_application_health(metrics: &AtomicMetrics) -> HealthStatus {
         let mut issues = Vec::new();
         let snapshot = metrics.snapshot();
-        
+
         // Check for error rates
         let total_messages = snapshot.messages_received;
-        let total_errors = snapshot.protocol_errors + snapshot.connection_errors + snapshot.auth_failures;
-        
+        let total_errors =
+            snapshot.protocol_errors + snapshot.connection_errors + snapshot.auth_failures;
+
         if total_messages > 0 {
             let error_rate = (total_errors as f64 / total_messages as f64) * 100.0;
             if error_rate > 10.0 {
                 issues.push(format!("High error rate: {:.1}%", error_rate));
             }
         }
-        
+
         // Check for stalled connections
         if snapshot.active_connections == 0 && snapshot.total_connections > 0 {
             issues.push("No active connections despite having total connections".to_string());
         }
-        
+
         // Check for memory leaks (simplified)
         if snapshot.active_connections > 10000 {
             issues.push("Unusually high number of active connections".to_string());
@@ -529,6 +553,7 @@ pub struct Alert {
 
 #[derive(Debug)]
 struct ThresholdBreach {
+    #[allow(dead_code)]
     rule_id: String,
     timestamp: Instant,
 }
@@ -554,6 +579,7 @@ pub struct PerformanceReport {
 struct HealthStatus {
     is_healthy: bool,
     issues: Vec<String>,
+    #[allow(dead_code)]
     checked_at: Instant,
 }
 
@@ -561,16 +587,16 @@ struct HealthStatus {
 mod tests {
     use super::*;
     use crate::services::metrics::AtomicMetrics;
-    use crate::services::performance::{ResourceMonitor, PerformanceProfiler};
+    use crate::services::performance::{PerformanceProfiler, ResourceMonitor};
 
     #[tokio::test]
     async fn test_monitoring_service_creation() {
         let metrics = Arc::new(AtomicMetrics::new());
         let resource_monitor = Arc::new(ResourceMonitor::new(100));
         let performance_profiler = Arc::new(PerformanceProfiler::new(1000));
-        
+
         let monitoring = MonitoringService::new(metrics, resource_monitor, performance_profiler);
-        
+
         let status = monitoring.get_status().await;
         assert!(!status.is_running);
     }
@@ -586,7 +612,7 @@ mod tests {
             cooldown: Duration::from_secs(300),
             enabled: true,
         };
-        
+
         assert_eq!(rule.id, "test_rule");
         assert!(rule.enabled);
     }

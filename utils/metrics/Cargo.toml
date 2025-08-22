@@ -10,13 +10,11 @@ crate-type = ["lib", "staticlib"]
 
 [features]
 default = []
-collector = ["dep:tokio"]
 
 [dependencies]
 dashmap = { workspace = true }
 metrics = { workspace = true }
 tracing = { workspace = true }
-tokio = { workspace = true, optional = true }
 
 [dev-dependencies]
 criterion = { workspace = true }

@@ -10,7 +10,7 @@ use crate::network::connection::Connection;
 use crate::network::proxy::MessageProcessor;
 use crate::processor::Message;
 use crate::protocol::types::Response;
-use crate::{processor, Manager};
+use crate::{Manager, processor};
 
 /// Pass-through processor that logs messages but doesn't modify them
 #[derive(Debug, Default)]
@@ -41,11 +41,16 @@ impl LoggingProcessor {
 
     fn log_message(&self, direction: &str, connection_id: &str, message: &Value) {
         let message_str = serde_json::to_string(message).unwrap_or_default();
-        
+
         match self.log_level {
             LogLevel::Trace => trace!("{} {} - Message: {}", direction, connection_id, message_str),
             LogLevel::Debug => debug!("{} {} - Message: {}", direction, connection_id, message_str),
-            LogLevel::Info => debug!("{} {} - Message size: {} bytes", direction, connection_id, message_str.len()),
+            LogLevel::Info => debug!(
+                "{} {} - Message size: {} bytes",
+                direction,
+                connection_id,
+                message_str.len()
+            ),
             LogLevel::Warn | LogLevel::Error | LogLevel::Off => {} // No logging for higher levels
         }
     }
@@ -53,17 +58,29 @@ impl LoggingProcessor {
 
 #[async_trait]
 impl MessageProcessor for LoggingProcessor {
-    async fn process_client_message(&self, message: Value, connection: &Arc<Connection>) -> Result<Value> {
+    async fn process_client_message(
+        &self,
+        message: Value,
+        connection: &Arc<Connection>,
+    ) -> Result<Value> {
         self.log_message("CLIENT->SERVER", &connection.id().to_string(), &message);
         connection.update_activity().await;
-        connection.record_message_received(serde_json::to_string(&message)?.len()).await;
+        connection
+            .record_message_received(serde_json::to_string(&message)?.len())
+            .await;
         Ok(message)
     }
 
-    async fn process_server_message(&self, message: Value, connection: &Arc<Connection>) -> Result<Value> {
+    async fn process_server_message(
+        &self,
+        message: Value,
+        connection: &Arc<Connection>,
+    ) -> Result<Value> {
         self.log_message("SERVER->CLIENT", &connection.id().to_string(), &message);
         connection.update_activity().await;
-        connection.record_message_received(serde_json::to_string(&message)?.len()).await;
+        connection
+            .record_message_received(serde_json::to_string(&message)?.len())
+            .await;
         Ok(message)
     }
 }
@@ -97,7 +114,7 @@ impl StratumProcessor {
         worker: String,
     ) -> Result<Value> {
         let addr = connection.remote_addr();
-        
+
         // Handle authentication
         let auth_state = self.manager.auth().authenticate(addr, &user, &worker);
         connection.authenticate((*auth_state).clone()).await?;
@@ -136,7 +153,7 @@ impl StratumProcessor {
                 connection.record_share_submission(true).await; // Assume valid for now
             }
         }
-        
+
         Ok(message)
     }
 
@@ -146,8 +163,13 @@ impl StratumProcessor {
         connection: &Arc<Connection>,
         difficulty: f64,
     ) -> Result<Value> {
-        self.difficulty.store(difficulty.to_bits(), Ordering::Relaxed);
-        debug!("Connection {} - Set difficulty to {}", connection.id(), difficulty);
+        self.difficulty
+            .store(difficulty.to_bits(), Ordering::Relaxed);
+        debug!(
+            "Connection {} - Set difficulty to {}",
+            connection.id(),
+            difficulty
+        );
         Ok(message)
     }
 
@@ -180,7 +202,7 @@ impl StratumProcessor {
     ) -> Result<Value> {
         let addr = connection.remote_addr();
         let submission = self.manager.submissions();
-        
+
         if let Some(auth) = self.manager.auth().get(&addr) {
             if let Some(id) = response.id {
                 if let Some(Some(result)) = response.result.as_ref().map(|r| r.as_bool()) {
@@ -195,19 +217,27 @@ impl StratumProcessor {
 
 #[async_trait]
 impl MessageProcessor for StratumProcessor {
-    async fn process_client_message(&self, message: Value, connection: &Arc<Connection>) -> Result<Value> {
+    async fn process_client_message(
+        &self,
+        message: Value,
+        connection: &Arc<Connection>,
+    ) -> Result<Value> {
         // Update connection activity
         connection.update_activity().await;
-        connection.record_message_received(serde_json::to_string(&message)?.len()).await;
+        connection
+            .record_message_received(serde_json::to_string(&message)?.len())
+            .await;
 
         // Parse message using the existing processor
         if let Some(parsed_message) = self.processor.parse(&serde_json::to_string(&message)?) {
             match parsed_message {
                 Message::Authenticate { user, worker, .. } => {
-                    self.handle_authentication(message, connection, user, worker).await
+                    self.handle_authentication(message, connection, user, worker)
+                        .await
                 }
                 Message::Submit { id, job_id } => {
-                    self.handle_submission(message, connection, id, job_id).await
+                    self.handle_submission(message, connection, id, job_id)
+                        .await
                 }
                 _ => Ok(message),
             }
@@ -217,10 +247,16 @@ impl MessageProcessor for StratumProcessor {
         }
     }
 
-    async fn process_server_message(&self, message: Value, connection: &Arc<Connection>) -> Result<Value> {
+    async fn process_server_message(
+        &self,
+        message: Value,
+        connection: &Arc<Connection>,
+    ) -> Result<Value> {
         // Update connection activity
         connection.update_activity().await;
-        connection.record_message_received(serde_json::to_string(&message)?.len()).await;
+        connection
+            .record_message_received(serde_json::to_string(&message)?.len())
+            .await;
 
         // Parse message using the existing processor
         if let Some(parsed_message) = self.processor.parse(&serde_json::to_string(&message)?) {
@@ -229,13 +265,15 @@ impl MessageProcessor for StratumProcessor {
                     self.handle_difficulty_update(message, connection, d).await
                 }
                 Message::Notify { job_id } => {
-                    self.handle_job_notification(message, connection, job_id).await
+                    self.handle_job_notification(message, connection, job_id)
+                        .await
                 }
                 _ => Ok(message),
             }
         } else if let Ok(response) = serde_json::from_value::<Response>(message.clone()) {
             // Handle submission responses
-            self.handle_submission_response(message, connection, response).await
+            self.handle_submission_response(message, connection, response)
+                .await
         } else {
             // Forward message as-is
             Ok(message)
@@ -278,22 +316,36 @@ impl CompositeProcessor {
         processor: Arc<processor::Manager>,
         difficulty: Arc<AtomicU64>,
     ) -> Self {
-        self.add_processor(Arc::new(StratumProcessor::new(manager, processor, difficulty)))
+        self.add_processor(Arc::new(StratumProcessor::new(
+            manager, processor, difficulty,
+        )))
     }
 }
 
 #[async_trait]
 impl MessageProcessor for CompositeProcessor {
-    async fn process_client_message(&self, mut message: Value, connection: &Arc<Connection>) -> Result<Value> {
+    async fn process_client_message(
+        &self,
+        mut message: Value,
+        connection: &Arc<Connection>,
+    ) -> Result<Value> {
         for processor in &self.processors {
-            message = processor.process_client_message(message, connection).await?;
+            message = processor
+                .process_client_message(message, connection)
+                .await?;
         }
         Ok(message)
     }
 
-    async fn process_server_message(&self, mut message: Value, connection: &Arc<Connection>) -> Result<Value> {
+    async fn process_server_message(
+        &self,
+        mut message: Value,
+        connection: &Arc<Connection>,
+    ) -> Result<Value> {
         for processor in &self.processors {
-            message = processor.process_server_message(message, connection).await?;
+            message = processor
+                .process_server_message(message, connection)
+                .await?;
         }
         Ok(message)
     }
@@ -302,6 +354,7 @@ impl MessageProcessor for CompositeProcessor {
 /// Rate limiting processor
 #[derive(Debug)]
 pub struct RateLimitProcessor {
+    #[allow(unused)]
     max_messages_per_minute: u64,
     // TODO: Add rate limiting implementation using a token bucket or sliding window
 }
@@ -316,14 +369,22 @@ impl RateLimitProcessor {
 
 #[async_trait]
 impl MessageProcessor for RateLimitProcessor {
-    async fn process_client_message(&self, message: Value, connection: &Arc<Connection>) -> Result<Value> {
+    async fn process_client_message(
+        &self,
+        message: Value,
+        connection: &Arc<Connection>,
+    ) -> Result<Value> {
         // TODO: Implement rate limiting logic
         // For now, just pass through
         connection.update_activity().await;
         Ok(message)
     }
 
-    async fn process_server_message(&self, message: Value, connection: &Arc<Connection>) -> Result<Value> {
+    async fn process_server_message(
+        &self,
+        message: Value,
+        connection: &Arc<Connection>,
+    ) -> Result<Value> {
         // Server messages are generally not rate limited
         connection.update_activity().await;
         Ok(message)
@@ -344,13 +405,21 @@ impl MetricsProcessor {
 
 #[async_trait]
 impl MessageProcessor for MetricsProcessor {
-    async fn process_client_message(&self, message: Value, connection: &Arc<Connection>) -> Result<Value> {
+    async fn process_client_message(
+        &self,
+        message: Value,
+        connection: &Arc<Connection>,
+    ) -> Result<Value> {
         // TODO: Collect metrics
         connection.update_activity().await;
         Ok(message)
     }
 
-    async fn process_server_message(&self, message: Value, connection: &Arc<Connection>) -> Result<Value> {
+    async fn process_server_message(
+        &self,
+        message: Value,
+        connection: &Arc<Connection>,
+    ) -> Result<Value> {
         // TODO: Collect metrics
         connection.update_activity().await;
         Ok(message)

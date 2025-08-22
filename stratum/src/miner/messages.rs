@@ -1,4 +1,4 @@
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 static MESSAGE_ID: AtomicU64 = AtomicU64::new(1);
@@ -9,7 +9,7 @@ impl StratumMessages {
     fn next_id() -> u64 {
         MESSAGE_ID.fetch_add(1, Ordering::SeqCst)
     }
-    
+
     pub fn mining_subscribe() -> Value {
         json!({
             "id": Self::next_id(),
@@ -17,7 +17,7 @@ impl StratumMessages {
             "params": ["MockMiner/1.0.0", null]
         })
     }
-    
+
     pub fn mining_authorize(username: &str, password: &str) -> Value {
         json!({
             "id": Self::next_id(),
@@ -25,7 +25,7 @@ impl StratumMessages {
             "params": [username, password]
         })
     }
-    
+
     pub fn mining_submit(
         worker: &str,
         job_id: &str,
@@ -39,7 +39,7 @@ impl StratumMessages {
             "params": [worker, job_id, extranonce2, ntime, nonce]
         })
     }
-    
+
     pub fn mining_extranonce_subscribe() -> Value {
         json!({
             "id": Self::next_id(),
@@ -47,7 +47,7 @@ impl StratumMessages {
             "params": []
         })
     }
-    
+
     pub fn mining_ping() -> Value {
         json!({
             "id": Self::next_id(),
@@ -55,7 +55,7 @@ impl StratumMessages {
             "params": []
         })
     }
-    
+
     pub fn mining_get_version() -> Value {
         json!({
             "id": Self::next_id(),
@@ -84,7 +84,7 @@ impl MiningJob {
         if params.len() < 9 {
             return None;
         }
-        
+
         Some(Self {
             job_id: params[0].as_str()?.to_string(),
             prev_hash: params[1].as_str()?.to_string(),
@@ -102,20 +102,20 @@ impl MiningJob {
             difficulty: current_difficulty,
         })
     }
-    
+
     pub fn is_valid_for_difficulty(&self, nonce: &str, difficulty: f64) -> bool {
         // Simple mock validation - in reality this would involve SHA256 hashing
         // For testing purposes, we'll use a simple hash of the nonce
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
-        
+
         let mut hasher = DefaultHasher::new();
         format!("{}:{}", self.job_id, nonce).hash(&mut hasher);
         let hash_value = hasher.finish();
-        
+
         // Calculate target from difficulty
         let target = (u64::MAX as f64 / difficulty) as u64;
-        
+
         hash_value <= target
     }
 }

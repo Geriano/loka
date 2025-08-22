@@ -4,4 +4,5 @@
 /target
 /logs
 .env
+*.env
 *.logs*

@@ -1,4 +1,4 @@
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 pub struct MockResponses;
 
@@ -17,19 +17,19 @@ impl MockResponses {
             "error": null
         })
     }
-    
+
     pub fn authorize_response(id: u64, authorized: bool) -> Value {
         json!({
             "id": id,
             "result": authorized,
-            "error": if authorized { 
-                Value::Null 
-            } else { 
-                json!(["Unauthorized worker", 25]) 
+            "error": if authorized {
+                Value::Null
+            } else {
+                json!(["Unauthorized worker", 25])
             }
         })
     }
-    
+
     pub fn notify_message(job_params: Vec<Value>) -> Value {
         json!({
             "id": null,
@@ -37,7 +37,7 @@ impl MockResponses {
             "params": job_params
         })
     }
-    
+
     pub fn set_difficulty_message(difficulty: u64) -> Value {
         json!({
             "id": null,
@@ -45,7 +45,7 @@ impl MockResponses {
             "params": [difficulty]
         })
     }
-    
+
     pub fn submit_response(id: u64, accepted: bool, error: Option<String>) -> Value {
         json!({
             "id": id,
@@ -53,7 +53,7 @@ impl MockResponses {
             "error": error.map(|e| json!([e, 20]))
         })
     }
-    
+
     pub fn extranonce_subscribe_response(id: u64) -> Value {
         json!({
             "id": id,
@@ -61,7 +61,7 @@ impl MockResponses {
             "error": null
         })
     }
-    
+
     pub fn ping_response(id: u64) -> Value {
         json!({
             "id": id,
@@ -69,7 +69,7 @@ impl MockResponses {
             "error": null
         })
     }
-    
+
     pub fn error_response(id: Option<u64>, error_msg: &str, error_code: i32) -> Value {
         json!({
             "id": id,
@@ -77,7 +77,7 @@ impl MockResponses {
             "error": [error_msg, error_code]
         })
     }
-    
+
     pub fn get_version_response(id: u64) -> Value {
         json!({
             "id": id,
@@ -85,7 +85,7 @@ impl MockResponses {
             "error": null
         })
     }
-    
+
     pub fn unknown_method_response(id: u64, method: &str) -> Value {
         json!({
             "id": id,

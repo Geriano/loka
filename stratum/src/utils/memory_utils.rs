@@ -1,5 +1,5 @@
-use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::mem;
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 
 /// Memory allocation tracking and optimization utilities
 pub struct MemoryTracker {
@@ -23,12 +23,17 @@ impl MemoryTracker {
         let size = size as u64;
         self.total_allocated.fetch_add(size, Ordering::Relaxed);
         self.allocation_count.fetch_add(1, Ordering::Relaxed);
-        
+
         // Update peak usage
         let current_usage = self.current_usage();
         let mut peak = self.peak_usage.load(Ordering::Relaxed);
         while current_usage > peak {
-            match self.peak_usage.compare_exchange_weak(peak, current_usage, Ordering::Relaxed, Ordering::Relaxed) {
+            match self.peak_usage.compare_exchange_weak(
+                peak,
+                current_usage,
+                Ordering::Relaxed,
+                Ordering::Relaxed,
+            ) {
                 Ok(_) => break,
                 Err(new_peak) => peak = new_peak,
             }
@@ -41,7 +46,8 @@ impl MemoryTracker {
     }
 
     pub fn current_usage(&self) -> u64 {
-        self.total_allocated.load(Ordering::Relaxed) - self.total_deallocated.load(Ordering::Relaxed)
+        self.total_allocated.load(Ordering::Relaxed)
+            - self.total_deallocated.load(Ordering::Relaxed)
     }
 
     pub fn peak_usage(&self) -> u64 {
@@ -81,6 +87,7 @@ pub struct ObjectPool<T> {
     // This eliminates lock contention in favor of allocation overhead
     // which is acceptable for most use cases in async contexts
     factory: Box<dyn Fn() -> T + Send + Sync>,
+    #[allow(dead_code)]
     reset: Option<Box<dyn Fn(&mut T) + Send + Sync>>,
     max_size: usize,
     created_count: AtomicUsize,
@@ -129,13 +136,6 @@ where
         PooledObject::new(obj)
     }
 
-    /// Return an object to the pool
-    /// Note: In this lock-free version, objects are always dropped
-    fn return_object(&self, _obj: T) {
-        // Simply drop the object to avoid lock contention
-        // The slight memory overhead is acceptable for async performance
-    }
-
     /// Get pool statistics
     pub fn stats(&self) -> ObjectPoolStats {
         ObjectPoolStats {
@@ -154,9 +154,7 @@ pub struct PooledObject<T> {
 
 impl<T> PooledObject<T> {
     fn new(obj: T) -> Self {
-        Self {
-            obj: Some(obj),
-        }
+        Self { obj: Some(obj) }
     }
 
     /// Take ownership of the object (won't be returned to pool)
@@ -242,11 +240,11 @@ impl AlignmentUtils {
     /// Get optimal capacity for growing containers
     pub fn optimal_capacity(current: usize, required: usize) -> usize {
         let mut capacity = current.max(8); // Minimum capacity
-        
+
         while capacity < required {
             capacity = capacity.saturating_mul(2);
         }
-        
+
         capacity
     }
 }
@@ -290,20 +288,18 @@ impl MemoryUtils {
 
     /// Batch allocate multiple Vecs to reduce allocation overhead
     pub fn batch_allocate_vecs<T>(sizes: &[usize]) -> Vec<Vec<T>> {
-        sizes.iter()
-            .map(|&size| Vec::with_capacity(size))
-            .collect()
+        sizes.iter().map(|&size| Vec::with_capacity(size)).collect()
     }
 
     /// Memory-efficient string concatenation
     pub fn concat_strings_efficient(strings: &[&str]) -> String {
         let total_len: usize = strings.iter().map(|s| s.len()).sum();
         let mut result = String::with_capacity(total_len);
-        
+
         for s in strings {
             result.push_str(s);
         }
-        
+
         result
     }
 
@@ -351,7 +347,7 @@ impl Arena {
             if chunk.capacity() < end_offset {
                 chunk.reserve(end_offset - chunk.capacity());
             }
-            
+
             // Extend the chunk if needed
             if chunk.len() < end_offset {
                 chunk.resize(end_offset, 0);
@@ -362,10 +358,11 @@ impl Arena {
             Some(chunk.as_mut_ptr()) // Just return the base pointer for now
         } else {
             // Need a new chunk
-            self.chunks.push(Vec::with_capacity(self.chunk_size.max(size + align)));
+            self.chunks
+                .push(Vec::with_capacity(self.chunk_size.max(size + align)));
             self.current_chunk += 1;
             self.current_offset = 0;
-            
+
             // Retry allocation in new chunk
             self.alloc(size, align)
         }
@@ -378,7 +375,10 @@ impl Arena {
 
     /// Get used memory
     pub fn used_memory(&self) -> usize {
-        self.chunks[0..self.current_chunk].iter().map(|chunk| chunk.len()).sum::<usize>()
+        self.chunks[0..self.current_chunk]
+            .iter()
+            .map(|chunk| chunk.len())
+            .sum::<usize>()
             + self.current_offset
     }
 
@@ -426,11 +426,11 @@ mod tests {
     #[test]
     fn test_memory_tracker() {
         let tracker = MemoryTracker::new();
-        
+
         tracker.record_allocation(1024);
         assert_eq!(tracker.current_usage(), 1024);
         assert_eq!(tracker.peak_usage(), 1024);
-        
+
         tracker.record_deallocation(512);
         assert_eq!(tracker.current_usage(), 512);
         assert_eq!(tracker.peak_usage(), 1024); // Peak should remain
@@ -438,22 +438,18 @@ mod tests {
 
     #[test]
     fn test_object_pool() {
-        let pool = ObjectPool::with_reset(
-            || Vec::<i32>::new(), 
-            |vec| vec.clear(), 
-            5
-        );
-        
+        let pool = ObjectPool::with_reset(|| Vec::<i32>::new(), |vec| vec.clear(), 5);
+
         let mut obj1 = pool.get();
         obj1.push(42);
         drop(obj1);
-        
+
         let obj2 = pool.get();
         assert_eq!(obj2.len(), 0); // Should be a new/reset object
-        
+
         let stats = pool.stats();
-        assert_eq!(stats.created_count, 2);  // Two objects created (no reuse in simplified version)
-        assert_eq!(stats.reused_count, 0);   // No objects reused
+        assert_eq!(stats.created_count, 2); // Two objects created (no reuse in simplified version)
+        assert_eq!(stats.reused_count, 0); // No objects reused
     }
 
     #[test]
@@ -461,7 +457,7 @@ mod tests {
         assert_eq!(AlignmentUtils::align_to_power_of_2(7), 8);
         assert_eq!(AlignmentUtils::align_to_power_of_2(8), 8);
         assert_eq!(AlignmentUtils::align_to_power_of_2(9), 16);
-        
+
         assert_eq!(AlignmentUtils::align_to(13, 8), 16);
         assert!(AlignmentUtils::is_aligned(16, 8));
         assert!(!AlignmentUtils::is_aligned(15, 8));
@@ -470,17 +466,17 @@ mod tests {
     #[test]
     fn test_arena() {
         let mut arena = Arena::with_chunk_size(1024);
-        
+
         let ptr1 = arena.alloc(64, 1).unwrap();
         let used_after_first = arena.used_memory();
         assert!(used_after_first >= 64);
-        
+
         let ptr2 = arena.alloc(128, 8).unwrap();
         let used_after_second = arena.used_memory();
-        
+
         // Check that memory usage increased
         assert!(used_after_second >= used_after_first + 128);
-        
+
         // Check alignment
         assert_eq!(ptr2 as usize % 8, 0, "ptr2 should be 8-byte aligned");
     }

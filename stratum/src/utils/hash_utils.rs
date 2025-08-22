@@ -31,7 +31,7 @@ impl HashUtils {
         // Calculate difficulty as max_target / current_target
         // This is a simplified version for demonstration
         let mut target_num = 0u64;
-        
+
         // Take first 8 bytes for approximation
         for (i, &byte) in target[0..8].iter().enumerate() {
             target_num |= (byte as u64) << (8 * (7 - i));
@@ -55,7 +55,7 @@ impl HashUtils {
         // Convert difficulty to integer arithmetic to avoid floating point
         let difficulty_int = (difficulty * 1000.0) as u64; // Scale by 1000 for precision
         let hashes_per_share = (difficulty_int * 4_294_967_296) / 1000; // 2^32 scaled
-        
+
         let total_hashes = shares * hashes_per_share;
         total_hashes / time_seconds
     }
@@ -72,10 +72,9 @@ impl HashUtils {
     /// Check if hash meets difficulty target (simplified)
     pub fn meets_difficulty(hash: &[u8; 32], difficulty: f64) -> bool {
         // Count leading zeros in hash
-        let leading_zeros = hash.iter()
-            .take_while(|&&byte| byte == 0)
-            .count() * 8
-            + hash.iter()
+        let leading_zeros = hash.iter().take_while(|&&byte| byte == 0).count() * 8
+            + hash
+                .iter()
                 .find(|&&byte| byte != 0)
                 .map(|&byte| byte.leading_zeros() as usize)
                 .unwrap_or(0);
@@ -107,9 +106,7 @@ impl OptimizedHashOps {
 
     /// Batch hash multiple strings
     pub fn batch_hash_strings(strings: &[&str]) -> Vec<(u64, String)> {
-        strings.iter()
-            .map(|&s| Self::pre_hash_string(s))
-            .collect()
+        strings.iter().map(|&s| Self::pre_hash_string(s)).collect()
     }
 
     /// Compare hashes quickly before string comparison
@@ -133,7 +130,7 @@ impl RollingHash {
     pub fn new(window_size: usize) -> Self {
         let base = Self::DEFAULT_BASE;
         let power = base.pow(window_size as u32 - 1);
-        
+
         Self {
             hash: 0,
             power,
@@ -153,11 +150,11 @@ impl RollingHash {
             let old_byte = self.buffer[0];
             self.buffer.rotate_left(1);
             self.buffer[self.window_size - 1] = byte;
-            
+
             self.hash = self.hash - (old_byte as u64 * self.power);
             self.hash = self.hash * self.base + byte as u64;
         }
-        
+
         self.hash
     }
 
@@ -181,11 +178,12 @@ pub struct SimpleBloomFilter {
 impl SimpleBloomFilter {
     pub fn new(capacity: usize, false_positive_rate: f64) -> Self {
         // Calculate optimal size and hash functions
-        let size = (-((capacity as f64) * false_positive_rate.ln()) / (2.0_f64.ln().powi(2))).ceil() as usize;
+        let size = (-((capacity as f64) * false_positive_rate.ln()) / (2.0_f64.ln().powi(2))).ceil()
+            as usize;
         let hash_functions = ((size as f64 / capacity as f64) * 2.0_f64.ln()).ceil() as u8;
-        
+
         let num_words = (size + 63) / 64; // Round up to word boundary
-        
+
         Self {
             bits: vec![0u64; num_words],
             size,
@@ -196,13 +194,13 @@ impl SimpleBloomFilter {
     pub fn insert<T: Hash>(&mut self, item: &T) {
         let hash1 = HashUtils::fast_hash(item);
         let hash2 = hash1.wrapping_mul(0x9e3779b97f4a7c15); // Golden ratio hash
-        
+
         for i in 0..self.hash_functions {
             let hash = hash1.wrapping_add(hash2.wrapping_mul(i as u64));
             let bit_index = (hash as usize) % self.size;
             let word_index = bit_index / 64;
             let bit_offset = bit_index % 64;
-            
+
             self.bits[word_index] |= 1u64 << bit_offset;
         }
     }
@@ -210,13 +208,13 @@ impl SimpleBloomFilter {
     pub fn contains<T: Hash>(&self, item: &T) -> bool {
         let hash1 = HashUtils::fast_hash(item);
         let hash2 = hash1.wrapping_mul(0x9e3779b97f4a7c15);
-        
+
         for i in 0..self.hash_functions {
             let hash = hash1.wrapping_add(hash2.wrapping_mul(i as u64));
             let bit_index = (hash as usize) % self.size;
             let word_index = bit_index / 64;
             let bit_offset = bit_index % 64;
-            
+
             if (self.bits[word_index] & (1u64 << bit_offset)) == 0 {
                 return false;
             }
@@ -229,18 +227,20 @@ impl SimpleBloomFilter {
     }
 
     pub fn estimated_count(&self) -> usize {
-        let set_bits = self.bits.iter()
+        let set_bits = self
+            .bits
+            .iter()
             .map(|word| word.count_ones() as usize)
             .sum::<usize>();
-        
+
         if set_bits == 0 {
             return 0;
         }
-        
+
         let m = self.size as f64;
         let k = self.hash_functions as f64;
         let x = set_bits as f64;
-        
+
         (-(m / k) * (1.0 - x / m).ln()) as usize
     }
 }
@@ -254,7 +254,7 @@ mod tests {
         let hash1 = HashUtils::fast_string_hash("hello");
         let hash2 = HashUtils::fast_string_hash("hello");
         let hash3 = HashUtils::fast_string_hash("world");
-        
+
         assert_eq!(hash1, hash2);
         assert_ne!(hash1, hash3);
     }
@@ -268,25 +268,25 @@ mod tests {
     #[test]
     fn test_rolling_hash() {
         let mut hasher = RollingHash::new(3);
-        
+
         hasher.add_byte(b'a');
         hasher.add_byte(b'b');
         hasher.add_byte(b'c');
         let hash1 = hasher.current_hash();
-        
+
         hasher.add_byte(b'd'); // Should roll off 'a'
         let hash2 = hasher.current_hash();
-        
+
         assert_ne!(hash1, hash2);
     }
 
     #[test]
     fn test_bloom_filter() {
         let mut filter = SimpleBloomFilter::new(1000, 0.01);
-        
+
         filter.insert(&"hello");
         filter.insert(&"world");
-        
+
         assert!(filter.contains(&"hello"));
         assert!(filter.contains(&"world"));
         assert!(!filter.contains(&"not_inserted"));

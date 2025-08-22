@@ -11,10 +11,10 @@ use crate::protocol::pipeline::MessageContext;
 pub trait MessageParser: Send + Sync + Debug {
     /// Parse raw message string into a StratumMessage
     async fn parse(&self, raw_message: &str) -> Result<Option<StratumMessage>>;
-    
+
     /// Serialize a StratumMessage back to string
     async fn serialize(&self, message: &StratumMessage) -> Result<String>;
-    
+
     /// Get supported protocol version
     fn protocol_version(&self) -> &'static str;
 }
@@ -24,10 +24,10 @@ pub trait MessageParser: Send + Sync + Debug {
 pub trait MessageHandler: Send + Sync + Debug {
     /// Handle a parsed message and return response
     async fn handle(&self, context: MessageContext) -> Result<Option<StratumMessage>>;
-    
+
     /// Check if handler supports this message type
     fn supports(&self, message: &StratumMessage) -> bool;
-    
+
     /// Get handler priority (lower numbers = higher priority)
     fn priority(&self) -> u32 {
         100
@@ -39,7 +39,7 @@ pub trait MessageHandler: Send + Sync + Debug {
 pub trait MessageValidator: Send + Sync + Debug {
     /// Validate a message according to protocol rules
     async fn validate(&self, message: &StratumMessage, context: &MessageContext) -> Result<()>;
-    
+
     /// Get validation rules description
     fn rules_description(&self) -> &'static str;
 }
@@ -48,17 +48,21 @@ pub trait MessageValidator: Send + Sync + Debug {
 #[async_trait]
 pub trait SessionManager: Send + Sync + Debug {
     /// Start a new session for a client
-    async fn start_session(&self, client_id: String, client_info: SessionInfo) -> Result<SessionHandle>;
-    
+    async fn start_session(
+        &self,
+        client_id: String,
+        client_info: SessionInfo,
+    ) -> Result<SessionHandle>;
+
     /// End a session
     async fn end_session(&self, session_id: &str) -> Result<()>;
-    
+
     /// Get session information
     async fn get_session(&self, session_id: &str) -> Result<Option<SessionInfo>>;
-    
+
     /// Update session state
     async fn update_session(&self, session_id: &str, update: SessionUpdate) -> Result<()>;
-    
+
     /// List active sessions
     async fn list_sessions(&self) -> Result<Vec<SessionInfo>>;
 }
@@ -98,12 +102,12 @@ impl SessionInfo {
             rejected_shares: 0,
         }
     }
-    
+
     pub fn with_client_ip(mut self, ip: std::net::SocketAddr) -> Self {
         self.client_ip = Some(ip);
         self
     }
-    
+
     pub fn authenticate(mut self, user: String, worker: String) -> Self {
         self.authenticated = true;
         self.user = Some(user);
@@ -143,15 +147,15 @@ impl SessionHandle {
 pub trait MessageRouter: Send + Sync + Debug {
     /// Route a message to appropriate handler
     async fn route(&self, context: MessageContext) -> Result<Option<StratumMessage>>;
-    
+
     /// Register a message handler
     async fn register_handler<H>(&self, handler: H) -> Result<()>
     where
         H: MessageHandler + 'static;
-    
+
     /// Remove a handler
     async fn unregister_handler(&self, handler_id: &str) -> Result<()>;
-    
+
     /// Get registered handlers count
     fn handlers_count(&self) -> usize;
 }
@@ -159,14 +163,19 @@ pub trait MessageRouter: Send + Sync + Debug {
 /// Trait for protocol statistics and metrics
 pub trait ProtocolMetrics: Send + Sync + Debug {
     /// Record message processing metrics
-    fn record_message(&self, message_type: &str, processing_time: std::time::Duration, success: bool);
-    
+    fn record_message(
+        &self,
+        message_type: &str,
+        processing_time: std::time::Duration,
+        success: bool,
+    );
+
     /// Record session metrics
     fn record_session_event(&self, event_type: &str, session_id: &str);
-    
+
     /// Record error metrics
     fn record_error(&self, error_type: &str, context: &str);
-    
+
     /// Get current metrics snapshot
     fn get_metrics(&self) -> ProtocolMetricsSnapshot;
 }
@@ -197,7 +206,7 @@ impl ProtocolMetricsSnapshot {
             timestamp: chrono::Utc::now(),
         }
     }
-    
+
     pub fn success_rate(&self) -> f64 {
         if self.total_messages == 0 {
             0.0

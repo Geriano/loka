@@ -159,8 +159,8 @@
 //!
 //! This project is licensed under the MIT License - see the LICENSE file for details.
 
-#[cfg(feature = "collector")]
-pub(crate) mod collector;
+// #[cfg(feature = "collector")]
+// pub(crate) mod collector;
 
 pub(crate) mod key;
 pub(crate) mod recorder;

@@ -1,9 +1,9 @@
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
-use loka_stratum::services::metrics::AtomicMetrics;
-use loka_stratum::protocol::parser::StratumParser;
-use loka_stratum::utils::string_pool::StringPool;
-use loka_stratum::utils::hash_utils::{HashUtils, RollingHash};
 use dashmap::DashMap;
+use loka_stratum::protocol::parser::StratumParser;
+use loka_stratum::services::metrics::AtomicMetrics;
+use loka_stratum::utils::hash_utils::{HashUtils, RollingHash};
+use loka_stratum::utils::string_pool::StringPool;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::collections::hash_map::DefaultHasher;
@@ -62,7 +62,7 @@ fn bench_atomic_metrics(c: &mut Criterion) {
 /// Benchmark Stratum message parsing (critical path for every incoming message)
 fn bench_stratum_parsing(c: &mut Criterion) {
     let parser = StratumParser::new();
-    
+
     // Test messages of varying complexity
     let simple_message = r#"{"id":1,"method":"mining.subscribe","params":[]}"#;
     let complex_message = r#"{"id":42,"method":"mining.submit","params":["username.worker1","job123","extranonce2","ntime","nonce"]}"#;
@@ -152,7 +152,8 @@ fn bench_hash_operations(c: &mut Criterion) {
 
     c.bench_function("fast_hash", |b| {
         b.iter(|| {
-            let hash = HashUtils::fast_string_hash(black_box(std::str::from_utf8(test_data).unwrap()));
+            let hash =
+                HashUtils::fast_string_hash(black_box(std::str::from_utf8(test_data).unwrap()));
             black_box(hash);
         })
     });

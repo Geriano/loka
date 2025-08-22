@@ -6,63 +6,63 @@ pub struct MinerConfig {
     /// Pool address to connect to
     #[serde(default = "default_pool_address")]
     pub pool_address: String,
-    
+
     /// Number of worker connections
     #[serde(default = "default_workers")]
     pub workers: usize,
-    
+
     /// Hashrate per worker in MH/s
     #[serde(default = "default_hashrate")]
     pub hashrate_mhs: f64,
-    
+
     /// Username for authentication
     #[serde(default = "default_username")]
     pub username: String,
-    
+
     /// Password for authentication
     #[serde(default = "default_password")]
     pub password: String,
-    
+
     /// Worker name prefix
     #[serde(default = "default_worker_prefix")]
     pub worker_prefix: String,
-    
+
     /// Share submission interval in seconds
     #[serde(default = "default_share_interval")]
     pub share_interval_secs: f64,
-    
+
     /// Connection timeout in seconds
     #[serde(default = "default_connection_timeout")]
     pub connection_timeout_secs: u64,
-    
+
     /// Keep-alive interval in seconds
     #[serde(default = "default_keepalive_interval")]
     pub keepalive_interval_secs: u64,
-    
+
     /// Difficulty variance factor (0.0-1.0)
     #[serde(default = "default_difficulty_variance")]
     pub difficulty_variance: f64,
-    
+
     /// Stale share rate (0.0-1.0)
     #[serde(default = "default_stale_rate")]
     pub stale_rate: f64,
-    
+
     /// Invalid share rate (0.0-1.0)
     #[serde(default = "default_invalid_rate")]
     pub invalid_rate: f64,
-    
+
     /// Reconnection attempts
     #[serde(default = "default_reconnect_attempts")]
     pub reconnect_attempts: u32,
-    
+
     /// Reconnection delay in seconds
     #[serde(default = "default_reconnect_delay")]
     pub reconnect_delay_secs: u64,
-    
+
     /// Enable mining notifications logging
     #[serde(default = "default_log_mining")]
     pub log_mining: bool,
-    
+
     /// Simulation duration in seconds (0 = infinite)
     #[serde(default = "default_duration")]
     pub duration_secs: u64,
@@ -95,19 +95,19 @@ impl MinerConfig {
     pub fn connection_timeout(&self) -> Duration {
         Duration::from_secs(self.connection_timeout_secs)
     }
-    
+
     pub fn keepalive_interval(&self) -> Duration {
         Duration::from_secs(self.keepalive_interval_secs)
     }
-    
+
     pub fn share_interval(&self) -> Duration {
         Duration::from_secs_f64(self.share_interval_secs)
     }
-    
+
     pub fn reconnect_delay(&self) -> Duration {
         Duration::from_secs(self.reconnect_delay_secs)
     }
-    
+
     pub fn simulation_duration(&self) -> Option<Duration> {
         if self.duration_secs > 0 {
             Some(Duration::from_secs(self.duration_secs))
@@ -115,21 +115,21 @@ impl MinerConfig {
             None
         }
     }
-    
+
     pub fn worker_name(&self, worker_id: usize) -> String {
         format!("{}.{}", self.worker_prefix, worker_id)
     }
-    
+
     pub fn total_hashrate(&self) -> f64 {
         self.hashrate_mhs * self.workers as f64
     }
-    
+
     pub fn should_submit_stale(&self) -> bool {
         use rand::Rng;
         let mut rng = rand::thread_rng();
         rng.gen_bool(self.stale_rate)
     }
-    
+
     pub fn should_submit_invalid(&self) -> bool {
         use rand::Rng;
         let mut rng = rand::thread_rng();

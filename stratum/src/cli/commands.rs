@@ -1,5 +1,5 @@
 use anyhow::Result;
-use axum::{http::StatusCode, response::Json, routing::get, Router};
+use axum::{Router, http::StatusCode, response::Json, routing::get};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
@@ -8,7 +8,6 @@ use tracing::{error, info, warn};
 
 use crate::cli::Args;
 use crate::config::Config;
-use crate::manager::Manager;
 use crate::services::metrics::{MetricsService, MetricsSnapshot, UserMetricsSnapshot};
 
 // Global metrics service for HTTP endpoints
@@ -160,12 +159,12 @@ async fn start_server(
                 warn!("⚠️ Metrics recorder already initialized: {}", e);
             }
         }
-        
+
         // Initialize Stratum metrics service
         let stratum_metrics = Arc::new(MetricsService::default());
         STRATUM_METRICS.set(stratum_metrics.clone()).ok();
         info!("✅ Stratum metrics service initialized");
-        
+
         info!("Starting metrics server on {}", metrics_addr);
         let metrics_server = start_metrics_server(metrics_addr).await?;
         tokio::spawn(metrics_server);
@@ -174,7 +173,7 @@ async fn start_server(
     // Create and start the actual server
     let config_arc = Arc::new(config);
     let listener = crate::Listener::new(config_arc).await?;
-    
+
     // Start server in background task
     let server_handle = tokio::spawn(async move {
         if let Err(e) = listener.accept().await {
@@ -358,8 +357,8 @@ impl From<loka_metrics::HistogramSummary> for SerializableHistogramSummary {
             max: summary.max,
             // For now, we'll use simple placeholders for percentiles
             // since the basic HistogramSummary doesn't include percentile calculation
-            p50: summary.mean, // Approximate using mean
-            p90: summary.max * 0.9 + summary.min * 0.1, // Approximate
+            p50: summary.mean,                            // Approximate using mean
+            p90: summary.max * 0.9 + summary.min * 0.1,   // Approximate
             p95: summary.max * 0.95 + summary.min * 0.05, // Approximate
             p99: summary.max * 0.99 + summary.min * 0.01, // Approximate
         }
@@ -389,19 +388,19 @@ struct HealthResponse {
 async fn get_metrics() -> Result<Json<MetricsResponse>, StatusCode> {
     // Get the current metrics recorder
     let recorder = loka_metrics::Recorder::current();
-    
+
     let timestamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
         .as_secs();
-    
+
     // Convert histograms to serializable format
     let histograms = recorder
         .histograms()
         .into_iter()
         .map(|(key, summary)| (key, SerializableHistogramSummary::from(summary)))
         .collect();
-    
+
     // Get Stratum metrics if available
     let (stratum_global, stratum_users) = if let Some(stratum_metrics) = STRATUM_METRICS.get() {
         let global = stratum_metrics.get_global_snapshot();
@@ -410,7 +409,7 @@ async fn get_metrics() -> Result<Json<MetricsResponse>, StatusCode> {
     } else {
         (None, Vec::new())
     };
-    
+
     let response = MetricsResponse {
         timestamp,
         counters: recorder.counters(),
@@ -419,7 +418,7 @@ async fn get_metrics() -> Result<Json<MetricsResponse>, StatusCode> {
         stratum_global,
         stratum_users,
     };
-    
+
     Ok(Json(response))
 }
 
@@ -428,7 +427,7 @@ async fn health_check() -> Json<HealthResponse> {
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
         .as_secs();
-    
+
     Json(HealthResponse {
         status: "healthy".to_string(),
         timestamp,
@@ -438,9 +437,9 @@ async fn health_check() -> Json<HealthResponse> {
 async fn get_prometheus_metrics() -> Result<String, StatusCode> {
     // Get the current metrics recorder
     let recorder = loka_metrics::Recorder::current();
-    
+
     let mut prometheus_output = String::new();
-    
+
     // Add counters
     for (name, value) in recorder.counters() {
         prometheus_output.push_str(&format!(
@@ -450,7 +449,7 @@ async fn get_prometheus_metrics() -> Result<String, StatusCode> {
             value
         ));
     }
-    
+
     // Add gauges
     for (name, value) in recorder.gauges() {
         prometheus_output.push_str(&format!(
@@ -460,28 +459,19 @@ async fn get_prometheus_metrics() -> Result<String, StatusCode> {
             value
         ));
     }
-    
+
     // Add histograms
     for (name, summary) in recorder.histograms() {
         let metric_name = sanitize_metric_name(&name);
-        prometheus_output.push_str(&format!(
-            "# TYPE {} histogram\n",
-            metric_name
-        ));
-        prometheus_output.push_str(&format!(
-            "{}_count {}\n",
-            metric_name, summary.count
-        ));
-        prometheus_output.push_str(&format!(
-            "{}_sum {}\n",
-            metric_name, summary.sum
-        ));
+        prometheus_output.push_str(&format!("# TYPE {} histogram\n", metric_name));
+        prometheus_output.push_str(&format!("{}_count {}\n", metric_name, summary.count));
+        prometheus_output.push_str(&format!("{}_sum {}\n", metric_name, summary.sum));
     }
-    
+
     // Add Stratum metrics if available
     if let Some(stratum_metrics) = STRATUM_METRICS.get() {
         let global = stratum_metrics.get_global_snapshot();
-        
+
         // Global connection metrics
         prometheus_output.push_str(&format!(
             "# TYPE stratum_total_connections counter\nstratum_total_connections {}\n",
@@ -495,7 +485,7 @@ async fn get_prometheus_metrics() -> Result<String, StatusCode> {
             "# TYPE stratum_connection_errors counter\nstratum_connection_errors {}\n",
             global.connection_errors
         ));
-        
+
         // Protocol metrics
         prometheus_output.push_str(&format!(
             "# TYPE stratum_messages_received counter\nstratum_messages_received {}\n",
@@ -513,7 +503,7 @@ async fn get_prometheus_metrics() -> Result<String, StatusCode> {
             "# TYPE stratum_bytes_sent counter\nstratum_bytes_sent {}\n",
             global.bytes_sent
         ));
-        
+
         // Auth metrics
         prometheus_output.push_str(&format!(
             "# TYPE stratum_auth_attempts counter\nstratum_auth_attempts {}\n",
@@ -527,7 +517,7 @@ async fn get_prometheus_metrics() -> Result<String, StatusCode> {
             "# TYPE stratum_auth_failures counter\nstratum_auth_failures {}\n",
             global.auth_failures
         ));
-        
+
         // Submission metrics
         prometheus_output.push_str(&format!(
             "# TYPE stratum_submissions_received counter\nstratum_submissions_received {}\n",
@@ -541,7 +531,7 @@ async fn get_prometheus_metrics() -> Result<String, StatusCode> {
             "# TYPE stratum_submissions_rejected counter\nstratum_submissions_rejected {}\n",
             global.submissions_rejected
         ));
-        
+
         // Security metrics
         prometheus_output.push_str(&format!(
             "# TYPE stratum_security_violations counter\nstratum_security_violations {}\n",
@@ -551,10 +541,11 @@ async fn get_prometheus_metrics() -> Result<String, StatusCode> {
             "# TYPE stratum_rate_limit_hits counter\nstratum_rate_limit_hits {}\n",
             global.rate_limit_hits
         ));
-        
+
         // User metrics
         let users = stratum_metrics.get_all_user_metrics();
-        for user in users.iter().take(100) { // Limit to 100 users to avoid huge responses
+        for user in users.iter().take(100) {
+            // Limit to 100 users to avoid huge responses
             let user_id = sanitize_label_value(&user.user_id);
             prometheus_output.push_str(&format!(
                 "stratum_user_submissions_received{{user=\"{}\"}} {}\n",
@@ -586,18 +577,25 @@ async fn get_prometheus_metrics() -> Result<String, StatusCode> {
             ));
         }
     }
-    
+
     Ok(prometheus_output)
 }
 
 fn sanitize_metric_name(name: &str) -> String {
     name.chars()
-        .map(|c| if c.is_alphanumeric() || c == '_' { c } else { '_' })
+        .map(|c| {
+            if c.is_alphanumeric() || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect()
 }
 
 fn sanitize_label_value(value: &str) -> String {
-    value.chars()
+    value
+        .chars()
         .map(|c| match c {
             '"' => '\'',
             '\\' => '/',
@@ -614,9 +612,9 @@ async fn start_metrics_server(bind_addr: String) -> Result<impl std::future::Fut
         .route("/metrics/prometheus", get(get_prometheus_metrics))
         .route("/health", get(health_check))
         .route("/", get(health_check)); // Root path also serves health check
-    
+
     info!("Starting metrics HTTP server on {}", bind_addr);
-    
+
     Ok(async move {
         let listener = match tokio::net::TcpListener::bind(&bind_addr).await {
             Ok(listener) => {
@@ -628,7 +626,7 @@ async fn start_metrics_server(bind_addr: String) -> Result<impl std::future::Fut
                 return;
             }
         };
-        
+
         if let Err(e) = axum::serve(listener, app).await {
             error!("Metrics server error: {}", e);
         }
@@ -666,9 +664,9 @@ async fn start_mock_pool(
     error_rate: f64,
 ) -> Result<()> {
     use crate::mock::{MockConfig, MockPool};
-    
+
     info!("Starting mock mining pool on {}", bind);
-    
+
     // Load or create config
     let mut config = if let Some(path) = config_path {
         let content = tokio::fs::read_to_string(path).await?;
@@ -676,7 +674,7 @@ async fn start_mock_pool(
     } else {
         MockConfig::default()
     };
-    
+
     // Override with CLI arguments
     config.accept_rate = accept_rate;
     config.job_interval_secs = job_interval;
@@ -684,33 +682,36 @@ async fn start_mock_pool(
     config.vardiff_enabled = vardiff;
     config.latency_ms = latency;
     config.error_rate = error_rate;
-    
+
     // Start the mock pool
     let pool = MockPool::new(config);
     let handle = pool.start(&bind).await?;
-    
+
     info!("Mock pool started successfully");
     info!("Configuration:");
     info!("  Accept rate: {:.1}%", accept_rate * 100.0);
     info!("  Job interval: {}s", job_interval);
     info!("  Initial difficulty: {}", difficulty);
-    info!("  Vardiff: {}", if vardiff { "enabled" } else { "disabled" });
+    info!(
+        "  Vardiff: {}",
+        if vardiff { "enabled" } else { "disabled" }
+    );
     info!("  Latency: {}ms", latency);
     info!("  Error rate: {:.1}%", error_rate * 100.0);
     info!("");
     info!("Press Ctrl+C to stop the mock pool");
-    
+
     // Wait for shutdown signal
     tokio::select! {
         _ = signal::ctrl_c() => {
             info!("Received shutdown signal");
         }
     }
-    
+
     info!("Shutting down mock pool...");
     handle.shutdown().await?;
     info!("Mock pool shutdown completed");
-    
+
     Ok(())
 }
 
@@ -730,9 +731,9 @@ async fn start_mock_miner(
     log_mining: bool,
 ) -> Result<()> {
     use crate::miner::{MinerConfig, MinerSimulator};
-    
+
     info!("Starting mock miner targeting {}", pool);
-    
+
     // Load or create config
     let mut config = if let Some(path) = config_path {
         let content = tokio::fs::read_to_string(path).await?;
@@ -740,7 +741,7 @@ async fn start_mock_miner(
     } else {
         MinerConfig::default()
     };
-    
+
     // Override with CLI arguments
     config.pool_address = pool;
     config.workers = workers;
@@ -753,7 +754,7 @@ async fn start_mock_miner(
     config.invalid_rate = invalid_rate;
     config.duration_secs = duration;
     config.log_mining = log_mining;
-    
+
     info!("Configuration:");
     info!("  Pool address: {}", config.pool_address);
     info!("  Workers: {}", config.workers);
@@ -763,18 +764,18 @@ async fn start_mock_miner(
     info!("  Share interval: {:.1}s", config.share_interval_secs);
     info!("  Stale rate: {:.1}%", config.stale_rate * 100.0);
     info!("  Invalid rate: {:.1}%", config.invalid_rate * 100.0);
-    
+
     if let Some(duration) = config.simulation_duration() {
         info!("  Duration: {:.1}s", duration.as_secs_f64());
     } else {
         info!("  Duration: infinite");
     }
-    
+
     info!("");
-    
+
     // Start the simulation
     let simulator = MinerSimulator::new(config);
     simulator.run().await?;
-    
+
     Ok(())
 }

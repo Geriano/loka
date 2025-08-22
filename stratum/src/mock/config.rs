@@ -5,31 +5,31 @@ use std::time::Duration;
 pub struct MockConfig {
     #[serde(default = "default_port")]
     pub port: u16,
-    
+
     #[serde(default = "default_accept_rate")]
     pub accept_rate: f64,
-    
+
     #[serde(default = "default_job_interval")]
     pub job_interval_secs: u64,
-    
+
     #[serde(default = "default_initial_difficulty")]
     pub initial_difficulty: u64,
-    
+
     #[serde(default = "default_vardiff_enabled")]
     pub vardiff_enabled: bool,
-    
+
     #[serde(default = "default_vardiff_target_time")]
     pub vardiff_target_time_secs: u64,
-    
+
     #[serde(default = "default_latency_ms")]
     pub latency_ms: u64,
-    
+
     #[serde(default = "default_error_rate")]
     pub error_rate: f64,
-    
+
     #[serde(default = "default_max_connections")]
     pub max_connections: usize,
-    
+
     #[serde(default = "default_extranonce_size")]
     pub extranonce_size: usize,
 }
@@ -55,21 +55,21 @@ impl MockConfig {
     pub fn job_interval(&self) -> Duration {
         Duration::from_secs(self.job_interval_secs)
     }
-    
+
     pub fn latency(&self) -> Duration {
         Duration::from_millis(self.latency_ms)
     }
-    
+
     pub fn vardiff_target_time(&self) -> Duration {
         Duration::from_secs(self.vardiff_target_time_secs)
     }
-    
+
     pub fn should_accept_share(&self) -> bool {
         use rand::Rng;
         let mut rng = rand::thread_rng();
         rng.gen_bool(self.accept_rate)
     }
-    
+
     pub fn should_inject_error(&self) -> bool {
         use rand::Rng;
         let mut rng = rand::thread_rng();

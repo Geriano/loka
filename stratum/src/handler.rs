@@ -16,8 +16,13 @@ impl Handler {
         Self { manager, config }
     }
 
-    pub fn create(&self, addr: SocketAddr) -> ProtocolHandler {
-        ProtocolHandler::new(Arc::clone(&self.manager), Arc::clone(&self.config), addr)
+    pub fn create(&self, addr: SocketAddr, path: Option<String>) -> ProtocolHandler {
+        ProtocolHandler::new(
+            Arc::clone(&self.manager),
+            Arc::clone(&self.config),
+            addr,
+            path,
+        )
     }
 }
 

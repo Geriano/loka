@@ -39,7 +39,7 @@ impl StratumMessage {
             Self::Submitted { .. } => "submitted",
         }
     }
-    
+
     pub fn id(&self) -> Option<u64> {
         match self {
             Self::Subscribe { id, .. } => Some(*id),
@@ -50,4 +50,3 @@ impl StratumMessage {
         }
     }
 }
-

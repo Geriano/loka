@@ -3,9 +3,9 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
+use crate::config::types::PoolConfig;
 use crate::error::Result;
 use crate::protocol::messages::StratumMessage;
-use crate::config::types::PoolConfig;
 
 /// Context passed through the middleware pipeline
 #[derive(Debug, Clone)]
@@ -30,7 +30,11 @@ impl MessageContext {
         }
     }
 
-    pub fn with_client_info(mut self, client_id: Option<String>, client_ip: Option<std::net::SocketAddr>) -> Self {
+    pub fn with_client_info(
+        mut self,
+        client_id: Option<String>,
+        client_ip: Option<std::net::SocketAddr>,
+    ) -> Self {
         self.client_id = client_id;
         self.client_ip = client_ip;
         self
@@ -117,11 +121,15 @@ impl PipelineBuilder {
     }
 
     pub fn with_rate_limiting(self, max_requests_per_minute: u64) -> Self {
-        self.add_middleware(crate::protocol::middleware::RateLimitingMiddleware::new(max_requests_per_minute))
+        self.add_middleware(crate::protocol::middleware::RateLimitingMiddleware::new(
+            max_requests_per_minute,
+        ))
     }
 
     pub fn with_authentication(self, pool_config: PoolConfig) -> Self {
-        self.add_middleware(crate::protocol::middleware::AuthenticationMiddleware::new(pool_config))
+        self.add_middleware(crate::protocol::middleware::AuthenticationMiddleware::new(
+            pool_config,
+        ))
     }
 
     pub fn with_logging(self) -> Self {

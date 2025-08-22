@@ -38,9 +38,21 @@ tower-http = { version = "0.6.6", features = ["cors", "full", "tokio", "tracing"
 hyper = { version = "1.7", features = ["http1", "http2"] }
 regex = "1.10"
 sysinfo = "0.32"
+rand = { version = "0.9.2" }
+hex = { version = "0.4.3" }
+sea-orm = { version = "2.0.0-rc.4", features = ["runtime-tokio", "sqlx", "sqlx-postgres"] }
+sea-orm-migration = { version = "2.0.0-rc.4", features = ["runtime-tokio", "sqlx-postgres", "sqlx-sqlite", "with-bigdecimal", "with-chrono", "with-rust_decimal", "with-uuid"] }
+sea-query = { version = "1.0.0-rc.10", features = ["chrono", "rust_decimal", "with-rust_decimal", "uuid", "with-uuid"] }
+sqlx = { version = "0.8.6", features = ["chrono", "postgres", "sqlx-postgres", "rust_decimal", "sqlx-macros", "uuid"] }
+rust_decimal = { version = "1.37.2", features = ["serde"] }
 
 [workspace.dependencies.loka-metrics]
 path = "utils/metrics"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
+
+[profile.bench]
+opt-level = 3
+incremental = true
+lto = "thin"

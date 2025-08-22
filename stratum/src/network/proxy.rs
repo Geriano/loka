@@ -16,10 +16,18 @@ use crate::network::tasks::TaskManager;
 #[async_trait]
 pub trait MessageProcessor: Send + Sync {
     /// Process message from client to server
-    async fn process_client_message(&self, message: Value, connection: &Arc<Connection>) -> Result<Value>;
-    
+    async fn process_client_message(
+        &self,
+        message: Value,
+        connection: &Arc<Connection>,
+    ) -> Result<Value>;
+
     /// Process message from server to client  
-    async fn process_server_message(&self, message: Value, connection: &Arc<Connection>) -> Result<Value>;
+    async fn process_server_message(
+        &self,
+        message: Value,
+        connection: &Arc<Connection>,
+    ) -> Result<Value>;
 }
 
 /// Pass-through processor that doesn't modify messages
@@ -28,11 +36,19 @@ pub struct PassThroughProcessor;
 
 #[async_trait]
 impl MessageProcessor for PassThroughProcessor {
-    async fn process_client_message(&self, message: Value, _connection: &Arc<Connection>) -> Result<Value> {
+    async fn process_client_message(
+        &self,
+        message: Value,
+        _connection: &Arc<Connection>,
+    ) -> Result<Value> {
         Ok(message)
     }
-    
-    async fn process_server_message(&self, message: Value, _connection: &Arc<Connection>) -> Result<Value> {
+
+    async fn process_server_message(
+        &self,
+        message: Value,
+        _connection: &Arc<Connection>,
+    ) -> Result<Value> {
         Ok(message)
     }
 }
@@ -41,6 +57,7 @@ impl MessageProcessor for PassThroughProcessor {
 pub struct BidirectionalProxy {
     connection: Arc<Connection>,
     processor: Arc<dyn MessageProcessor>,
+    #[allow(unused)]
     task_manager: Option<Arc<TaskManager>>,
 }
 
@@ -56,7 +73,7 @@ impl BidirectionalProxy {
 
     /// Create a new bidirectional proxy with task management
     pub fn with_task_manager(
-        connection: Arc<Connection>, 
+        connection: Arc<Connection>,
         processor: Arc<dyn MessageProcessor>,
         task_manager: Arc<TaskManager>,
     ) -> Self {
@@ -90,21 +107,46 @@ impl BidirectionalProxy {
         let server_writer_task = self.spawn_server_writer(server_writer, client_to_server_rx);
 
         // Wait for all tasks to complete
-        let (client_reader_result, server_reader_result, client_writer_result, server_writer_result) =
-            tokio::join!(client_reader_task, server_reader_task, client_writer_task, server_writer_task);
+        let (
+            client_reader_result,
+            server_reader_result,
+            client_writer_result,
+            server_writer_result,
+        ) = tokio::join!(
+            client_reader_task,
+            server_reader_task,
+            client_writer_task,
+            server_writer_task
+        );
 
         // Log any errors
         if let Err(e) = client_reader_result {
-            error!("Connection {} - Client reader task failed: {}", self.connection.id(), e);
+            error!(
+                "Connection {} - Client reader task failed: {}",
+                self.connection.id(),
+                e
+            );
         }
         if let Err(e) = server_reader_result {
-            error!("Connection {} - Server reader task failed: {}", self.connection.id(), e);
+            error!(
+                "Connection {} - Server reader task failed: {}",
+                self.connection.id(),
+                e
+            );
         }
         if let Err(e) = client_writer_result {
-            error!("Connection {} - Client writer task failed: {}", self.connection.id(), e);
+            error!(
+                "Connection {} - Client writer task failed: {}",
+                self.connection.id(),
+                e
+            );
         }
         if let Err(e) = server_writer_result {
-            error!("Connection {} - Server writer task failed: {}", self.connection.id(), e);
+            error!(
+                "Connection {} - Server writer task failed: {}",
+                self.connection.id(),
+                e
+            );
         }
 
         debug!("Connection {} - Proxy completed", self.connection.id());
@@ -128,7 +170,11 @@ impl BidirectionalProxy {
                 buffer.clear();
 
                 // Check for termination
-                if connection.should_terminate(std::time::Duration::from_secs(300)).await.is_some() {
+                if connection
+                    .should_terminate(std::time::Duration::from_secs(300))
+                    .await
+                    .is_some()
+                {
                     debug!("Connection {} - Client reader terminating", connection.id());
                     break;
                 }
@@ -136,7 +182,9 @@ impl BidirectionalProxy {
                 match reader.read_line(&mut buffer).await {
                     Ok(0) => {
                         debug!("Connection {} - Client disconnected", connection.id());
-                        connection.disconnect(DisconnectReason::ClientDisconnect).await;
+                        connection
+                            .disconnect(DisconnectReason::ClientDisconnect)
+                            .await;
                         break;
                     }
                     Ok(bytes_read) => {
@@ -144,38 +192,55 @@ impl BidirectionalProxy {
 
                         match serde_json::from_str::<Value>(buffer.trim()) {
                             Ok(message) => {
-                                trace!("Connection {} - Client message: {}", 
-                                    connection.id(), 
+                                trace!(
+                                    "Connection {} - Client message: {}",
+                                    connection.id(),
                                     serde_json::to_string(&message).unwrap_or_default()
                                 );
 
                                 match processor.process_client_message(message, &connection).await {
                                     Ok(processed_message) => {
                                         if let Err(e) = sender.send(processed_message) {
-                                            error!("Connection {} - Failed to send processed client message: {}",
-                                                connection.id(), e);
+                                            error!(
+                                                "Connection {} - Failed to send processed client message: {}",
+                                                connection.id(),
+                                                e
+                                            );
                                             break;
                                         }
                                     }
                                     Err(e) => {
-                                        error!("Connection {} - Failed to process client message: {}", 
-                                            connection.id(), e);
+                                        error!(
+                                            "Connection {} - Failed to process client message: {}",
+                                            connection.id(),
+                                            e
+                                        );
                                         continue;
                                     }
                                 }
                             }
                             Err(e) => {
-                                warn!("Connection {} - Invalid JSON from client: {} - {}", 
-                                    connection.id(), buffer.trim(), e);
+                                warn!(
+                                    "Connection {} - Invalid JSON from client: {} - {}",
+                                    connection.id(),
+                                    buffer.trim(),
+                                    e
+                                );
                                 continue;
                             }
                         }
                     }
                     Err(e) => {
-                        error!("Connection {} - Error reading from client: {}", connection.id(), e);
-                        connection.disconnect(DisconnectReason::NetworkError {
-                            error: e.to_string(),
-                        }).await;
+                        error!(
+                            "Connection {} - Error reading from client: {}",
+                            connection.id(),
+                            e
+                        );
+                        connection
+                            .disconnect(DisconnectReason::NetworkError {
+                                error: e.to_string(),
+                            })
+                            .await;
                         break;
                     }
                 }
@@ -202,7 +267,11 @@ impl BidirectionalProxy {
                 buffer.clear();
 
                 // Check for termination
-                if connection.should_terminate(std::time::Duration::from_secs(300)).await.is_some() {
+                if connection
+                    .should_terminate(std::time::Duration::from_secs(300))
+                    .await
+                    .is_some()
+                {
                     debug!("Connection {} - Server reader terminating", connection.id());
                     break;
                 }
@@ -210,9 +279,11 @@ impl BidirectionalProxy {
                 match reader.read_line(&mut buffer).await {
                     Ok(0) => {
                         debug!("Connection {} - Server disconnected", connection.id());
-                        connection.disconnect(DisconnectReason::NetworkError {
-                            error: "Server connection closed".to_string(),
-                        }).await;
+                        connection
+                            .disconnect(DisconnectReason::NetworkError {
+                                error: "Server connection closed".to_string(),
+                            })
+                            .await;
                         break;
                     }
                     Ok(bytes_read) => {
@@ -220,38 +291,55 @@ impl BidirectionalProxy {
 
                         match serde_json::from_str::<Value>(buffer.trim()) {
                             Ok(message) => {
-                                trace!("Connection {} - Server message: {}", 
-                                    connection.id(), 
+                                trace!(
+                                    "Connection {} - Server message: {}",
+                                    connection.id(),
                                     serde_json::to_string(&message).unwrap_or_default()
                                 );
 
                                 match processor.process_server_message(message, &connection).await {
                                     Ok(processed_message) => {
                                         if let Err(e) = sender.send(processed_message) {
-                                            error!("Connection {} - Failed to send processed server message: {}",
-                                                connection.id(), e);
+                                            error!(
+                                                "Connection {} - Failed to send processed server message: {}",
+                                                connection.id(),
+                                                e
+                                            );
                                             break;
                                         }
                                     }
                                     Err(e) => {
-                                        error!("Connection {} - Failed to process server message: {}", 
-                                            connection.id(), e);
+                                        error!(
+                                            "Connection {} - Failed to process server message: {}",
+                                            connection.id(),
+                                            e
+                                        );
                                         continue;
                                     }
                                 }
                             }
                             Err(e) => {
-                                warn!("Connection {} - Invalid JSON from server: {} - {}", 
-                                    connection.id(), buffer.trim(), e);
+                                warn!(
+                                    "Connection {} - Invalid JSON from server: {} - {}",
+                                    connection.id(),
+                                    buffer.trim(),
+                                    e
+                                );
                                 continue;
                             }
                         }
                     }
                     Err(e) => {
-                        error!("Connection {} - Error reading from server: {}", connection.id(), e);
-                        connection.disconnect(DisconnectReason::NetworkError {
-                            error: e.to_string(),
-                        }).await;
+                        error!(
+                            "Connection {} - Error reading from server: {}",
+                            connection.id(),
+                            e
+                        );
+                        connection
+                            .disconnect(DisconnectReason::NetworkError {
+                                error: e.to_string(),
+                            })
+                            .await;
                         break;
                     }
                 }
@@ -276,27 +364,42 @@ impl BidirectionalProxy {
             while let Some(message) = receiver.recv().await {
                 count += 1;
 
-                let message_str = serde_json::to_string(&message)
-                    .unwrap_or_else(|_| "{}".to_string());
+                let message_str =
+                    serde_json::to_string(&message).unwrap_or_else(|_| "{}".to_string());
                 let message_line = format!("{}\n", message_str);
 
-                trace!("Connection {} - Sending message #{} to client", 
-                    connection.id(), count);
+                trace!(
+                    "Connection {} - Sending message #{} to client",
+                    connection.id(),
+                    count
+                );
 
                 if let Err(e) = writer.write_all(message_line.as_bytes()).await {
-                    error!("Connection {} - Failed to write to client: {}", connection.id(), e);
+                    error!(
+                        "Connection {} - Failed to write to client: {}",
+                        connection.id(),
+                        e
+                    );
                     break;
                 }
 
                 if let Err(e) = writer.flush().await {
-                    error!("Connection {} - Failed to flush client writer: {}", connection.id(), e);
+                    error!(
+                        "Connection {} - Failed to flush client writer: {}",
+                        connection.id(),
+                        e
+                    );
                     break;
                 }
 
                 connection.record_message_sent(message_line.len()).await;
             }
 
-            debug!("Connection {} - Client writer completed ({} messages)", connection.id(), count);
+            debug!(
+                "Connection {} - Client writer completed ({} messages)",
+                connection.id(),
+                count
+            );
             Ok(())
         })
     }
@@ -316,27 +419,42 @@ impl BidirectionalProxy {
             while let Some(message) = receiver.recv().await {
                 count += 1;
 
-                let message_str = serde_json::to_string(&message)
-                    .unwrap_or_else(|_| "{}".to_string());
+                let message_str =
+                    serde_json::to_string(&message).unwrap_or_else(|_| "{}".to_string());
                 let message_line = format!("{}\n", message_str);
 
-                trace!("Connection {} - Sending message #{} to server", 
-                    connection.id(), count);
+                trace!(
+                    "Connection {} - Sending message #{} to server",
+                    connection.id(),
+                    count
+                );
 
                 if let Err(e) = writer.write_all(message_line.as_bytes()).await {
-                    error!("Connection {} - Failed to write to server: {}", connection.id(), e);
+                    error!(
+                        "Connection {} - Failed to write to server: {}",
+                        connection.id(),
+                        e
+                    );
                     break;
                 }
 
                 if let Err(e) = writer.flush().await {
-                    error!("Connection {} - Failed to flush server writer: {}", connection.id(), e);
+                    error!(
+                        "Connection {} - Failed to flush server writer: {}",
+                        connection.id(),
+                        e
+                    );
                     break;
                 }
 
                 connection.record_message_sent(message_line.len()).await;
             }
 
-            debug!("Connection {} - Server writer completed ({} messages)", connection.id(), count);
+            debug!(
+                "Connection {} - Server writer completed ({} messages)",
+                connection.id(),
+                count
+            );
             Ok(())
         })
     }
@@ -365,7 +483,9 @@ impl ProxyBuilder {
 
     /// Build the proxy
     pub fn build(self) -> BidirectionalProxy {
-        let processor = self.processor.unwrap_or_else(|| Arc::new(PassThroughProcessor));
+        let processor = self
+            .processor
+            .unwrap_or_else(|| Arc::new(PassThroughProcessor));
         BidirectionalProxy::new(self.connection, processor)
     }
 }

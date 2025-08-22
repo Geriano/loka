@@ -1,10 +1,10 @@
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
 use dashmap::DashMap;
 use tokio::sync::RwLock;
-use tokio::time::{interval, sleep};
+use tokio::time::interval;
 use tracing::{debug, info};
 
 use crate::error::{Result, StratumError};
@@ -13,17 +13,18 @@ use crate::error::{Result, StratumError};
 pub struct CachingService<K, V> {
     /// Cache storage
     cache: DashMap<K, CacheEntry<V>>,
-    
+
     /// Configuration
     config: CacheConfig,
-    
+
     /// Statistics
     stats: CacheStats,
-    
+
     /// Cleanup task handle
     cleanup_task: Arc<RwLock<Option<tokio::task::JoinHandle<()>>>>,
 }
 
+#[allow(dead_code)]
 impl<K, V> CachingService<K, V>
 where
     K: std::hash::Hash + Eq + Clone + Send + Sync + 'static,
@@ -62,7 +63,10 @@ where
         });
 
         *cleanup_task = Some(task);
-        info!("Caching service started with cleanup interval: {:?}", cleanup_interval);
+        info!(
+            "Caching service started with cleanup interval: {:?}",
+            cleanup_interval
+        );
         Ok(())
     }
 
@@ -114,15 +118,15 @@ where
 
         let expiration = ttl.map(|ttl| Instant::now() + ttl);
         let entry = CacheEntry::new(value, expiration);
-        
+
         let is_update = self.cache.insert(key, entry).is_some();
-        
+
         if is_update {
             self.stats.updates.fetch_add(1, Ordering::Relaxed);
         } else {
             self.stats.insertions.fetch_add(1, Ordering::Relaxed);
         }
-        
+
         Ok(())
     }
 
@@ -163,7 +167,9 @@ where
     pub fn clear(&self) {
         let count = self.cache.len();
         self.cache.clear();
-        self.stats.removals.fetch_add(count as u64, Ordering::Relaxed);
+        self.stats
+            .removals
+            .fetch_add(count as u64, Ordering::Relaxed);
     }
 
     /// Get cache statistics
@@ -186,7 +192,7 @@ where
         let hits = self.stats.hits.load(Ordering::Relaxed);
         let misses = self.stats.misses.load(Ordering::Relaxed);
         let total = hits + misses;
-        
+
         if total == 0 {
             0.0
         } else {
@@ -198,7 +204,7 @@ where
     async fn cleanup_expired_entries(cache: &DashMap<K, CacheEntry<V>>) {
         let mut expired_count = 0;
         let now = Instant::now();
-        
+
         cache.retain(|_, entry| {
             if entry.is_expired_at(now) {
                 expired_count += 1;
@@ -207,7 +213,7 @@ where
                 true
             }
         });
-        
+
         if expired_count > 0 {
             debug!("Cleaned up {} expired cache entries", expired_count);
         }
@@ -233,22 +239,22 @@ where
     async fn evict_lru(&self) {
         let target_size = self.config.max_entries * 3 / 4; // Evict 25%
         let mut entries_to_remove = Vec::new();
-        
+
         // Collect entries with their access times
         let mut access_times: Vec<(K, Instant)> = Vec::new();
         for entry in self.cache.iter() {
             access_times.push((entry.key().clone(), entry.value().last_accessed));
         }
-        
+
         // Sort by access time (oldest first)
         access_times.sort_by_key(|(_, time)| *time);
-        
+
         // Mark entries for removal
         let entries_to_evict = self.cache.len().saturating_sub(target_size);
         for (key, _) in access_times.into_iter().take(entries_to_evict) {
             entries_to_remove.push(key);
         }
-        
+
         // Remove entries
         let mut evicted_count = 0;
         for key in entries_to_remove {
@@ -256,8 +262,10 @@ where
                 evicted_count += 1;
             }
         }
-        
-        self.stats.evictions.fetch_add(evicted_count, Ordering::Relaxed);
+
+        self.stats
+            .evictions
+            .fetch_add(evicted_count, Ordering::Relaxed);
         debug!("Evicted {} LRU cache entries", evicted_count);
     }
 
@@ -265,22 +273,25 @@ where
     async fn evict_lfu(&self) {
         let target_size = self.config.max_entries * 3 / 4;
         let mut entries_to_remove = Vec::new();
-        
+
         // Collect entries with their access counts
         let mut access_counts: Vec<(K, u64)> = Vec::new();
         for entry in self.cache.iter() {
-            access_counts.push((entry.key().clone(), entry.value().access_count.load(Ordering::Relaxed)));
+            access_counts.push((
+                entry.key().clone(),
+                entry.value().access_count.load(Ordering::Relaxed),
+            ));
         }
-        
+
         // Sort by access count (lowest first)
         access_counts.sort_by_key(|(_, count)| *count);
-        
+
         // Mark entries for removal
         let entries_to_evict = self.cache.len().saturating_sub(target_size);
         for (key, _) in access_counts.into_iter().take(entries_to_evict) {
             entries_to_remove.push(key);
         }
-        
+
         // Remove entries
         let mut evicted_count = 0;
         for key in entries_to_remove {
@@ -288,8 +299,10 @@ where
                 evicted_count += 1;
             }
         }
-        
-        self.stats.evictions.fetch_add(evicted_count, Ordering::Relaxed);
+
+        self.stats
+            .evictions
+            .fetch_add(evicted_count, Ordering::Relaxed);
         debug!("Evicted {} LFU cache entries", evicted_count);
     }
 
@@ -297,28 +310,31 @@ where
     async fn evict_random(&self) {
         let target_size = self.config.max_entries * 3 / 4;
         let entries_to_evict = self.cache.len().saturating_sub(target_size);
-        
+
         let mut evicted_count = 0;
         let mut keys_to_remove = Vec::new();
-        
+
         // Collect random keys
         for entry in self.cache.iter().take(entries_to_evict) {
             keys_to_remove.push(entry.key().clone());
         }
-        
+
         // Remove entries
         for key in keys_to_remove {
             if self.cache.remove(&key).is_some() {
                 evicted_count += 1;
             }
         }
-        
-        self.stats.evictions.fetch_add(evicted_count, Ordering::Relaxed);
+
+        self.stats
+            .evictions
+            .fetch_add(evicted_count, Ordering::Relaxed);
         debug!("Evicted {} random cache entries", evicted_count);
     }
 }
 
 /// Cache entry with expiration and access tracking
+#[allow(dead_code)]
 struct CacheEntry<V> {
     value: V,
     expiration: Option<Instant>,
@@ -382,11 +398,11 @@ impl CompressionUtils {
                 count = 1;
             }
         }
-        
+
         // Push the last run
         compressed.push(count);
         compressed.push(current_byte);
-        
+
         compressed
     }
 
@@ -397,16 +413,16 @@ impl CompressionUtils {
         }
 
         let mut decompressed = Vec::new();
-        
+
         for chunk in compressed.chunks(2) {
             let count = chunk[0];
             let byte = chunk[1];
-            
+
             for _ in 0..count {
                 decompressed.push(byte);
             }
         }
-        
+
         decompressed
     }
 
@@ -456,7 +472,9 @@ impl CompressedData {
     pub fn decompress(&self) -> Vec<u8> {
         match self.compression_type {
             CompressionType::None => self.compressed_data.clone(),
-            CompressionType::SimpleRLE => CompressionUtils::decompress_simple(&self.compressed_data),
+            CompressionType::SimpleRLE => {
+                CompressionUtils::decompress_simple(&self.compressed_data)
+            }
         }
     }
 
@@ -482,7 +500,7 @@ impl Default for CacheConfig {
             max_entries: 10_000,
             initial_capacity: 1_000,
             default_ttl: Some(Duration::from_secs(3600)), // 1 hour
-            cleanup_interval: Duration::from_secs(60), // 1 minute
+            cleanup_interval: Duration::from_secs(60),    // 1 minute
             eviction_policy: EvictionPolicy::LRU,
         }
     }
@@ -490,10 +508,10 @@ impl Default for CacheConfig {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum EvictionPolicy {
-    LRU,  // Least Recently Used
-    LFU,  // Least Frequently Used
+    LRU, // Least Recently Used
+    LFU, // Least Frequently Used
     Random,
-    RejectNew,  // Reject new entries when full
+    RejectNew, // Reject new entries when full
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -546,36 +564,43 @@ mod tests {
     #[tokio::test]
     async fn test_cache_basic_operations() {
         let cache = CachingService::new(CacheConfig::default());
-        
+
         // Test put and get
-        cache.put("key1".to_string(), "value1".to_string(), None).unwrap();
+        cache
+            .put("key1".to_string(), "value1".to_string(), None)
+            .unwrap();
         assert_eq!(cache.get(&"key1".to_string()), Some("value1".to_string()));
-        
+
         // Test miss
         assert_eq!(cache.get(&"nonexistent".to_string()), None);
-        
+
         // Test remove
-        assert_eq!(cache.remove(&"key1".to_string()), Some("value1".to_string()));
+        assert_eq!(
+            cache.remove(&"key1".to_string()),
+            Some("value1".to_string())
+        );
         assert_eq!(cache.get(&"key1".to_string()), None);
     }
 
     #[tokio::test]
     async fn test_cache_ttl() {
         let cache = CachingService::new(CacheConfig::default());
-        
+
         // Put with short TTL
-        cache.put(
-            "key1".to_string(),
-            "value1".to_string(),
-            Some(Duration::from_millis(100))
-        ).unwrap();
-        
+        cache
+            .put(
+                "key1".to_string(),
+                "value1".to_string(),
+                Some(Duration::from_millis(100)),
+            )
+            .unwrap();
+
         // Should be available immediately
         assert_eq!(cache.get(&"key1".to_string()), Some("value1".to_string()));
-        
+
         // Wait for expiration
-        sleep(Duration::from_millis(150)).await;
-        
+        tokio::time::sleep(Duration::from_millis(150)).await;
+
         // Should be expired
         assert_eq!(cache.get(&"key1".to_string()), None);
     }
@@ -585,7 +610,7 @@ mod tests {
         let data = b"aaabbbcccdddeee";
         let compressed = CompressionUtils::compress_simple(data);
         let decompressed = CompressionUtils::decompress_simple(&compressed);
-        
+
         assert_eq!(data, decompressed.as_slice());
         assert!(compressed.len() < data.len()); // Should be smaller
     }
@@ -595,7 +620,7 @@ mod tests {
         let original = b"hello world hello world";
         let compressed_data = CompressedData::new(original, CompressionType::SimpleRLE);
         let decompressed = compressed_data.decompress();
-        
+
         assert_eq!(original, decompressed.as_slice());
         assert!(compressed_data.compression_ratio() >= 0.0);
     }

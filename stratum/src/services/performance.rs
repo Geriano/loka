@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use dashmap::DashMap;
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime};
@@ -44,7 +44,7 @@ impl ResourceMonitor {
             let cpu_usage = system.global_cpu_usage();
             let memory_used = system.used_memory();
             let memory_total = system.total_memory();
-            
+
             (cpu_usage, memory_used, memory_total)
         }; // system lock is dropped here
 
@@ -106,7 +106,7 @@ impl ResourceMonitor {
     pub async fn is_under_pressure(&self) -> ResourcePressure {
         let cpu_avg = self.get_average_cpu_usage().await;
         let memory_history = self.memory_usage_history.read().await;
-        
+
         let memory_pressure = if let Some(&latest_memory) = memory_history.last() {
             latest_memory > 0 // Will be calculated properly with total memory
         } else {
@@ -141,21 +141,28 @@ impl PerformanceProfiler {
 
     /// Start timing an operation
     pub fn start_timing(&self, operation: &str) -> OperationTimer {
-        OperationTimer::new(operation.to_string(), Arc::clone(&self.operation_times), self.max_samples)
+        OperationTimer::new(
+            operation.to_string(),
+            Arc::clone(&self.operation_times),
+            self.max_samples,
+        )
     }
 
     /// Record an operation duration manually
     pub async fn record_duration(&self, operation: &str, duration: Duration) {
-        let mut operation_times = self.operation_times.entry(operation.to_string())
+        let mut operation_times = self
+            .operation_times
+            .entry(operation.to_string())
             .or_insert_with(Vec::new);
-        
+
         operation_times.push(duration);
         if operation_times.len() > self.max_samples {
             operation_times.remove(0);
         }
 
         // Update count
-        self.operation_counts.entry(operation.to_string())
+        self.operation_counts
+            .entry(operation.to_string())
             .or_insert_with(|| AtomicU64::new(0))
             .fetch_add(1, Ordering::Relaxed);
     }
@@ -167,7 +174,9 @@ impl PerformanceProfiler {
                 return None;
             }
 
-            let total_count = self.operation_counts.get(operation)
+            let total_count = self
+                .operation_counts
+                .get(operation)
                 .map(|c| c.load(Ordering::Relaxed))
                 .unwrap_or(0);
 
@@ -176,7 +185,7 @@ impl PerformanceProfiler {
 
             let sum: Duration = sorted_times.iter().sum();
             let avg = sum / sorted_times.len() as u32;
-            
+
             let median = if sorted_times.len() % 2 == 0 {
                 let mid = sorted_times.len() / 2;
                 (sorted_times[mid - 1] + sorted_times[mid]) / 2
@@ -185,12 +194,14 @@ impl PerformanceProfiler {
             };
 
             let p95_idx = (sorted_times.len() as f64 * 0.95) as usize;
-            let p95 = sorted_times.get(p95_idx.min(sorted_times.len() - 1))
+            let p95 = sorted_times
+                .get(p95_idx.min(sorted_times.len() - 1))
                 .copied()
                 .unwrap_or(Duration::ZERO);
 
             let p99_idx = (sorted_times.len() as f64 * 0.99) as usize;
-            let p99 = sorted_times.get(p99_idx.min(sorted_times.len() - 1))
+            let p99 = sorted_times
+                .get(p99_idx.min(sorted_times.len() - 1))
                 .copied()
                 .unwrap_or(Duration::ZERO);
 
@@ -251,7 +262,11 @@ pub struct OperationTimer {
 }
 
 impl OperationTimer {
-    fn new(operation: String, times_store: Arc<DashMap<String, Vec<Duration>>>, max_samples: usize) -> Self {
+    fn new(
+        operation: String,
+        times_store: Arc<DashMap<String, Vec<Duration>>>,
+        max_samples: usize,
+    ) -> Self {
         Self {
             operation,
             start_time: Instant::now(),
@@ -263,10 +278,12 @@ impl OperationTimer {
     /// Finish timing and record the result
     pub async fn finish(self) -> Duration {
         let duration = self.start_time.elapsed();
-        
-        let mut operation_times = self.times_store.entry(self.operation.clone())
+
+        let mut operation_times = self
+            .times_store
+            .entry(self.operation.clone())
             .or_insert_with(Vec::new);
-        
+
         operation_times.push(duration);
         if operation_times.len() > self.max_samples {
             operation_times.remove(0);
@@ -325,6 +342,7 @@ where
 /// Note: In lock-free version, items are simply dropped
 pub struct PooledItem<T> {
     item: Option<T>,
+    #[allow(unused)]
     max_size: usize,
 }
 
@@ -386,18 +404,14 @@ impl PerformanceUtils {
     }
 
     /// Batch process items to reduce per-item overhead
-    pub async fn batch_process<T, F, R>(
-        items: Vec<T>,
-        batch_size: usize,
-        processor: F,
-    ) -> Vec<R>
+    pub async fn batch_process<T, F, R>(items: Vec<T>, batch_size: usize, processor: F) -> Vec<R>
     where
         F: Fn(Vec<T>) -> Vec<R> + Send,
         T: Send + Clone,
         R: Send,
     {
         let mut results = Vec::with_capacity(items.len());
-        
+
         for chunk in items.chunks(batch_size) {
             let batch_results = processor(chunk.to_vec());
             results.extend(batch_results);
@@ -414,7 +428,7 @@ impl PerformanceUtils {
         let initial_memory = Self::get_memory_usage();
         let result = operation();
         let final_memory = Self::get_memory_usage();
-        
+
         let memory_delta = final_memory.saturating_sub(initial_memory);
         (result, memory_delta)
     }
@@ -428,9 +442,9 @@ impl PerformanceUtils {
 
     /// Optimize string operations by reusing allocations
     pub fn optimize_string_concat(parts: &[&str], separator: &str) -> String {
-        let total_len: usize = parts.iter().map(|s| s.len()).sum::<usize>() 
+        let total_len: usize = parts.iter().map(|s| s.len()).sum::<usize>()
             + separator.len() * (parts.len().saturating_sub(1));
-        
+
         let mut result = String::with_capacity(total_len);
         for (i, part) in parts.iter().enumerate() {
             if i > 0 {

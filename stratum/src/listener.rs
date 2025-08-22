@@ -46,8 +46,16 @@ impl Listener {
 
                     metrics::counter!("network_connected_total").increment(1);
 
+                    let connection_path: Option<String> = None;
+                    let processed_downstream = downstream;
+
                     // Parse the pool address from the configuration
-                    let upstream_addr = self.manager.config().pool.address.parse::<std::net::SocketAddr>()?;
+                    let upstream_addr = self
+                        .manager
+                        .config()
+                        .pool
+                        .address
+                        .parse::<std::net::SocketAddr>()?;
 
                     let start = Instant::now();
 
@@ -65,10 +73,10 @@ impl Listener {
                                 latency
                             );
 
-                            let handler = self.handler_factory.create(addr);
+                            let handler = self.handler_factory.create(addr, connection_path);
 
                             tokio::spawn(async move {
-                                if let Err(e) = handler.run(downstream, upstream).await {
+                                if let Err(e) = handler.run(processed_downstream, upstream).await {
                                     tracing::error!("miner {} - Error: {}", addr, e);
                                 }
 
@@ -104,4 +112,120 @@ impl Listener {
             }
         }
     }
+
+    // /// Handle HTTP CONNECT request and extract path (NiceHash-style)
+    // /// Returns the processed stream and any extracted path
+    // async fn handle_http_connect(
+    //     stream: TcpStream,
+    //     addr: std::net::SocketAddr,
+    // ) -> (TcpStream, Option<String>) {
+    //     tracing::debug!("miner {} - Checking for HTTP CONNECT request", addr);
+
+    //     // Try to read the first line to check if it's HTTP CONNECT
+    //     let result = Self::process_potential_connect(stream, addr).await;
+    //     let (processed_stream, path) = result;
+
+    //     if let Some(ref p) = path {
+    //         tracing::info!("miner {} - Path extracted from HTTP CONNECT: {}", addr, p);
+    //     } else {
+    //         tracing::debug!(
+    //             "miner {} - Direct Stratum connection (no HTTP CONNECT)",
+    //             addr
+    //         );
+    //     }
+
+    //     (processed_stream, path)
+    // }
+
+    // /// Process potential HTTP CONNECT request
+    // async fn process_potential_connect(
+    //     stream: TcpStream,
+    //     addr: std::net::SocketAddr,
+    // ) -> (TcpStream, Option<String>) {
+    //     // Use a different approach - peek at the data without consuming it
+    //     let mut buf = [0u8; 1024];
+
+    //     // Try to peek at the data first
+    //     match stream.try_read(&mut buf) {
+    //         Ok(n) if n > 0 => {
+    //             let data = String::from_utf8_lossy(&buf[..n]);
+    //             let first_line = data.lines().next().unwrap_or("");
+
+    //             tracing::debug!("miner {} - First line detected: {}", addr, first_line);
+
+    //             if first_line.starts_with("CONNECT ") {
+    //                 // It's an HTTP CONNECT request - we need to consume it properly
+    //                 let mut reader = BufReader::new(stream);
+    //                 let mut line = String::new();
+    //                 let _ = reader.read_line(&mut line).await;
+
+    //                 let path = Self::parse_connect_path(&line);
+
+    //                 // Send HTTP response
+    //                 let mut stream = reader.into_inner();
+    //                 if let Err(e) = stream
+    //                     .write_all(b"HTTP/1.1 200 Connection established\r\n\r\n")
+    //                     .await
+    //                 {
+    //                     tracing::error!("miner {} - Failed to send HTTP response: {}", addr, e);
+    //                 }
+
+    //                 tracing::info!(
+    //                     "miner {} - HTTP CONNECT tunnel established with path: {:?}",
+    //                     addr,
+    //                     path
+    //                 );
+    //                 (stream, path)
+    //             } else {
+    //                 // It's direct Stratum - return the stream as-is
+    //                 tracing::debug!(
+    //                     "miner {} - Direct Stratum connection (no HTTP CONNECT)",
+    //                     addr
+    //                 );
+    //                 (stream, None)
+    //             }
+    //         }
+    //         Ok(0) => {
+    //             tracing::debug!("miner {} - No data available", addr);
+    //             (stream, None)
+    //         }
+    //         Ok(_) => {
+    //             // Handle any other successful read size
+    //             tracing::debug!("miner {} - Data available, assuming direct Stratum", addr);
+    //             (stream, None)
+    //         }
+    //         Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+    //             // No data ready yet - assume direct Stratum
+    //             tracing::debug!(
+    //                 "miner {} - No immediate data, assuming direct Stratum",
+    //                 addr
+    //             );
+    //             (stream, None)
+    //         }
+    //         Err(e) => {
+    //             tracing::debug!("miner {} - Error peeking at stream: {}", addr, e);
+    //             (stream, None)
+    //         }
+    //     }
+    // }
+
+    // /// Parse the path from HTTP CONNECT request line
+    // /// Format: "CONNECT host:port/path HTTP/1.1"
+    // fn parse_connect_path(connect_line: &str) -> Option<String> {
+    //     let parts: Vec<&str> = connect_line.split_whitespace().collect();
+    //     if parts.len() >= 2 && parts[0] == "CONNECT" {
+    //         let target = parts[1];
+
+    //         // Look for path after the port
+    //         // Format: host:port/path or host:port/path/subpath
+    //         if let Some(path_start) = target.find('/') {
+    //             let path = &target[path_start + 1..];
+    //             if !path.is_empty() {
+    //                 tracing::debug!("Extracted path from CONNECT: {}", path);
+    //                 return Some(path.to_string());
+    //             }
+    //         }
+    //     }
+    //     None
+    // }
 }

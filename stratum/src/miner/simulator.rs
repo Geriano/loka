@@ -2,7 +2,7 @@ use anyhow::Result;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::signal;
-use tokio::sync::{broadcast, RwLock};
+use tokio::sync::{RwLock, broadcast};
 use tokio::time::{interval, sleep};
 use tracing::info;
 
@@ -41,22 +41,22 @@ impl SimulationStats {
             shares_per_minute: 0.0,
         }
     }
-    
+
     pub fn update_from_workers(&mut self, worker_stats: &[WorkerStats]) {
         self.total_runtime = self.start_time.elapsed();
         self.connected_workers = worker_stats.iter().filter(|w| w.connected).count();
         self.authorized_workers = worker_stats.iter().filter(|w| w.authorized).count();
-        
+
         self.total_shares_submitted = worker_stats.iter().map(|w| w.shares_submitted).sum();
         self.total_shares_accepted = worker_stats.iter().map(|w| w.shares_accepted).sum();
         self.total_shares_rejected = worker_stats.iter().map(|w| w.shares_rejected).sum();
-        
+
         self.acceptance_rate = if self.total_shares_submitted > 0 {
             (self.total_shares_accepted as f64 / self.total_shares_submitted as f64) * 100.0
         } else {
             0.0
         };
-        
+
         let runtime_minutes = self.total_runtime.as_secs_f64() / 60.0;
         self.shares_per_minute = if runtime_minutes > 0.0 {
             self.total_shares_submitted as f64 / runtime_minutes
@@ -95,7 +95,7 @@ impl MinerSimulator {
     pub fn new(config: MinerConfig) -> Self {
         let stats = SimulationStats::new(config.workers);
         let (shutdown_tx, shutdown_rx) = broadcast::channel(1);
-        
+
         Self {
             config,
             stats: Arc::new(RwLock::new(stats)),
@@ -103,29 +103,32 @@ impl MinerSimulator {
             shutdown_rx,
         }
     }
-    
+
     pub async fn run(self) -> Result<()> {
-        info!("Starting mining simulation with {} workers", self.config.workers);
+        info!(
+            "Starting mining simulation with {} workers",
+            self.config.workers
+        );
         info!("Target pool: {}", self.config.pool_address);
         info!("Total hashrate: {:.2} MH/s", self.config.total_hashrate());
-        
+
         if let Some(duration) = self.config.simulation_duration() {
             info!("Simulation duration: {:.1} seconds", duration.as_secs_f64());
         } else {
             info!("Simulation duration: infinite (Ctrl+C to stop)");
         }
-        
+
         // Start mock miner
         let mut miner = MockMiner::new(self.config.clone());
         miner.start().await?;
-        
+
         // Start statistics reporting
         let stats_handle = self.start_stats_reporting();
-        
+
         // Wait for shutdown condition
         let duration = self.config.simulation_duration();
         let mut shutdown_rx = self.shutdown_rx;
-        
+
         tokio::select! {
             _ = signal::ctrl_c() => {
                 info!("Received Ctrl+C, shutting down...");
@@ -143,32 +146,31 @@ impl MinerSimulator {
                 info!("Received shutdown signal");
             }
         }
-        
+
         // Cleanup
         stats_handle.abort();
         let _ = self.shutdown_tx.send(());
-        
+
         // Shutdown miner
         miner.shutdown().await?;
-        
+
         // Print final statistics
         let final_stats = self.stats.read().await;
         info!("Final statistics: {}", *final_stats);
-        
+
         Ok(())
     }
-    
-    
+
     fn start_stats_reporting(&self) -> tokio::task::JoinHandle<()> {
         let stats = Arc::clone(&self.stats);
         let _config = self.config.clone();
-        
+
         tokio::spawn(async move {
             let mut interval = interval(Duration::from_secs(10)); // Report every 10 seconds
-            
+
             loop {
                 interval.tick().await;
-                
+
                 // Note: In a real implementation, we would collect actual worker stats
                 // For now, we'll just report the current stats
                 let stats_guard = stats.read().await;
@@ -176,15 +178,15 @@ impl MinerSimulator {
             }
         })
     }
-    
+
     pub async fn get_stats(&self) -> SimulationStats {
         self.stats.read().await.clone()
     }
-    
+
     pub async fn shutdown(&self) {
         let _ = self.shutdown_tx.send(());
     }
-    
+
     pub fn config(&self) -> &MinerConfig {
         &self.config
     }

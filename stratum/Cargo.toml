@@ -39,8 +39,8 @@ utoipa-axum = { workspace = true }
 utoipa-swagger-ui = { workspace = true }
 regex = { workspace = true }
 sysinfo = { workspace = true }
-rand = { version = "0.8", optional = true }
-hex = { version = "0.4", optional = true }
+rand = { workspace = true, optional = true }
+hex = { workspace = true, optional = true }
 
 [dependencies.loka-metrics]
 workspace = true

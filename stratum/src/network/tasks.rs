@@ -1,9 +1,9 @@
-use std::collections::HashMap;
 use dashmap::DashMap;
+use std::collections::HashMap;
 use std::future::Future;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use tokio::task::{JoinHandle, JoinError};
+use tokio::task::{JoinError, JoinHandle};
 use tracing::{debug, info};
 
 use crate::error::Result;
@@ -71,7 +71,10 @@ impl<T> TaskHandle<T> {
     }
 
     pub fn abort(&self) {
-        debug!("Aborting task: {} ({})", self.metadata.name, self.metadata.id);
+        debug!(
+            "Aborting task: {} ({})",
+            self.metadata.name, self.metadata.id
+        );
         self.handle.abort();
     }
 
@@ -124,7 +127,12 @@ impl TaskManager {
     }
 
     /// Spawn a new task with metadata tracking
-    pub async fn spawn<F, T>(&self, name: String, category: TaskCategory, future: F) -> TaskHandle<T>
+    pub async fn spawn<F, T>(
+        &self,
+        name: String,
+        category: TaskCategory,
+        future: F,
+    ) -> TaskHandle<T>
     where
         F: Future<Output = T> + Send + 'static,
         T: Send + 'static,
@@ -144,7 +152,10 @@ impl TaskManager {
         // Spawn the task
         let handle = tokio::spawn(future);
 
-        debug!("Spawned task: {} ({}) - category: {}", name, task_id, category);
+        debug!(
+            "Spawned task: {} ({}) - category: {}",
+            name, task_id, category
+        );
 
         TaskHandle::new(metadata, handle)
     }
@@ -176,8 +187,10 @@ impl TaskManager {
         // Spawn the task
         let handle = tokio::spawn(future);
 
-        debug!("Spawned task: {} ({}) - {}, category: {}", 
-               name, task_id, description, category);
+        debug!(
+            "Spawned task: {} ({}) - {}, category: {}",
+            name, task_id, description, category
+        );
 
         TaskHandle::new(metadata, handle)
     }
@@ -186,25 +199,30 @@ impl TaskManager {
     pub async fn untrack_task(&self, task_id: TaskId) {
         if let Some((_, metadata)) = self.tasks.remove(&task_id) {
             let duration = metadata.created_at.elapsed();
-            debug!("Untracking task: {} ({}) - ran for {:?}", 
-                   metadata.name, task_id, duration);
+            debug!(
+                "Untracking task: {} ({}) - ran for {:?}",
+                metadata.name, task_id, duration
+            );
         }
     }
 
     /// Get all active tasks
     pub async fn active_tasks(&self) -> Vec<TaskMetadata> {
-        self.tasks.iter().map(|entry| entry.value().clone()).collect()
+        self.tasks
+            .iter()
+            .map(|entry| entry.value().clone())
+            .collect()
     }
 
     /// Get task count by category
     pub async fn task_count_by_category(&self) -> HashMap<TaskCategory, usize> {
         let mut counts = HashMap::new();
-        
+
         for entry in self.tasks.iter() {
             let metadata = entry.value();
             *counts.entry(metadata.category).or_insert(0) += 1;
         }
-        
+
         counts
     }
 
@@ -216,14 +234,14 @@ impl TaskManager {
     /// Shutdown all tasks (abort all active tasks)
     pub async fn shutdown_all(&self) -> Result<()> {
         let task_count = self.tasks.len();
-        
+
         info!("Shutting down {} active tasks", task_count);
-        
+
         // Note: This only removes from tracking, actual abort would require storing handles
         // For a complete implementation, we'd need to store the actual JoinHandles
-        
+
         self.tasks.clear();
-        
+
         info!("Task shutdown complete");
         Ok(())
     }
@@ -235,18 +253,18 @@ impl TaskManager {
             tasks: DashMap::new(),
             cleanup_interval: self.cleanup_interval,
         };
-        
+
         let cleanup_interval = self.cleanup_interval;
-        
+
         self.spawn(
             "task-cleanup".to_string(),
             TaskCategory::Background,
             async move {
                 let mut interval = tokio::time::interval(cleanup_interval);
-                
+
                 loop {
                     interval.tick().await;
-                    
+
                     // Cleanup logic would go here
                     // For now, just log periodically
                     let count = task_manager.active_task_count().await;
@@ -255,19 +273,20 @@ impl TaskManager {
                     }
                 }
             },
-        ).await
+        )
+        .await
     }
 
     /// Get task statistics
     pub async fn get_statistics(&self) -> TaskManagerStatistics {
         let mut stats = TaskManagerStatistics::default();
-        
+
         stats.total_active_tasks = self.tasks.len();
-        
+
         for entry in self.tasks.iter() {
             let metadata = entry.value();
             let age = metadata.created_at.elapsed();
-            
+
             match metadata.category {
                 TaskCategory::Connection => stats.connection_tasks += 1,
                 TaskCategory::Protocol => stats.protocol_tasks += 1,
@@ -275,16 +294,16 @@ impl TaskManager {
                 TaskCategory::Background => stats.background_tasks += 1,
                 TaskCategory::Network => stats.network_tasks += 1,
             }
-            
+
             if age > stats.oldest_task_age {
                 stats.oldest_task_age = age;
             }
-            
+
             if stats.newest_task_age.is_zero() || age < stats.newest_task_age {
                 stats.newest_task_age = age;
             }
         }
-        
+
         stats
     }
 }
@@ -343,7 +362,9 @@ impl std::fmt::Display for TaskManagerStatistics {
 #[macro_export]
 macro_rules! spawn_task {
     ($task_manager:expr, $name:expr, $category:expr, $future:expr) => {{
-        $task_manager.spawn($name.to_string(), $category, $future).await
+        $task_manager
+            .spawn($name.to_string(), $category, $future)
+            .await
     }};
 }
 
@@ -351,12 +372,14 @@ macro_rules! spawn_task {
 #[macro_export]
 macro_rules! spawn_task_with_description {
     ($task_manager:expr, $name:expr, $description:expr, $category:expr, $future:expr) => {{
-        $task_manager.spawn_with_description(
-            $name.to_string(), 
-            $description.to_string(), 
-            $category, 
-            $future
-        ).await
+        $task_manager
+            .spawn_with_description(
+                $name.to_string(),
+                $description.to_string(),
+                $category,
+                $future,
+            )
+            .await
     }};
 }
 
@@ -368,21 +391,24 @@ mod tests {
     #[tokio::test]
     async fn test_task_manager_basic() {
         let manager = TaskManager::new();
-        
+
         // Test task spawning
-        let handle = manager.spawn(
-            "test-task".to_string(),
-            TaskCategory::Background,
-            async { 42 }
-        ).await;
-        
+        let handle = manager
+            .spawn("test-task".to_string(), TaskCategory::Background, async {
+                42
+            })
+            .await;
+
         assert_eq!(handle.metadata.name, "test-task");
-        assert_eq!(handle.metadata.category as u8, TaskCategory::Background as u8);
-        
+        assert_eq!(
+            handle.metadata.category as u8,
+            TaskCategory::Background as u8
+        );
+
         // Test task completion
         let result = handle.join().await.unwrap();
         assert_eq!(result, 42);
-        
+
         // Test statistics
         let stats = manager.get_statistics().await;
         assert_eq!(stats.total_active_tasks, 1); // Still tracked until untracked
@@ -391,12 +417,18 @@ mod tests {
     #[tokio::test]
     async fn test_task_categories() {
         let manager = TaskManager::new();
-        
+
         // Spawn tasks of different categories
-        let _handle1 = manager.spawn("conn-1".to_string(), TaskCategory::Connection, async { }).await;
-        let _handle2 = manager.spawn("proto-1".to_string(), TaskCategory::Protocol, async { }).await;
-        let _handle3 = manager.spawn("net-1".to_string(), TaskCategory::Network, async { }).await;
-        
+        let _handle1 = manager
+            .spawn("conn-1".to_string(), TaskCategory::Connection, async {})
+            .await;
+        let _handle2 = manager
+            .spawn("proto-1".to_string(), TaskCategory::Protocol, async {})
+            .await;
+        let _handle3 = manager
+            .spawn("net-1".to_string(), TaskCategory::Network, async {})
+            .await;
+
         let counts = manager.task_count_by_category().await;
         assert_eq!(counts.get(&TaskCategory::Connection), Some(&1));
         assert_eq!(counts.get(&TaskCategory::Protocol), Some(&1));

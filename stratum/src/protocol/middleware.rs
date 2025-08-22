@@ -5,11 +5,11 @@ use async_trait::async_trait;
 use dashmap::DashMap;
 use tracing::{debug, info, warn};
 
+use crate::config::types::PoolConfig;
 use crate::error::{Result, StratumError};
 use crate::protocol::messages::StratumMessage;
 use crate::protocol::parser::StratumParser;
 use crate::protocol::pipeline::{MessageContext, Middleware};
-use crate::config::types::PoolConfig;
 
 /// Middleware for parsing raw messages into StratumMessage
 #[derive(Debug)]
@@ -39,13 +39,11 @@ impl Middleware for ParsingMiddleware {
                 context = context.with_parsed_message(message);
                 Ok(context)
             }
-            None => {
-                Err(StratumError::Protocol {
-                    message: "Failed to parse message".to_string(),
-                    method: None,
-                    request_id: None,
-                })
-            }
+            None => Err(StratumError::Protocol {
+                message: "Failed to parse message".to_string(),
+                method: None,
+                request_id: None,
+            }),
         }
     }
 }
@@ -146,7 +144,7 @@ impl RateLimitingMiddleware {
 
     fn should_rate_limit(&self, client_key: &str) -> bool {
         let now = SystemTime::now();
-        
+
         // Clean up old entries
         self.client_data.retain(|_, data| {
             now.duration_since(data.window_start)
@@ -155,13 +153,14 @@ impl RateLimitingMiddleware {
         });
 
         let mut should_limit = false;
-        
+
         self.client_data
             .entry(client_key.to_string())
             .and_modify(|data| {
-                let window_age = now.duration_since(data.window_start)
+                let window_age = now
+                    .duration_since(data.window_start)
                     .unwrap_or(Duration::from_secs(0));
-                
+
                 if window_age >= Duration::from_secs(60) {
                     // Reset window
                     data.window_start = now;
@@ -173,11 +172,9 @@ impl RateLimitingMiddleware {
                     }
                 }
             })
-            .or_insert_with(|| {
-                RateLimitData {
-                    requests: AtomicU64::new(1),
-                    window_start: now,
-                }
+            .or_insert_with(|| RateLimitData {
+                requests: AtomicU64::new(1),
+                window_start: now,
             });
 
         should_limit
@@ -188,16 +185,16 @@ impl RateLimitingMiddleware {
 impl Middleware for RateLimitingMiddleware {
     async fn process(&self, context: MessageContext) -> Result<MessageContext> {
         let client_key = self.get_client_key(&context);
-        
+
         if self.should_rate_limit(&client_key) {
             warn!("Rate limiting client: {}", client_key);
             return Err(StratumError::Protocol {
-                            message: "Rate limit exceeded".to_string(),
-                            method: None,
-                            request_id: None,
-                        });
+                message: "Rate limit exceeded".to_string(),
+                method: None,
+                request_id: None,
+            });
         }
-        
+
         Ok(context)
     }
 }
@@ -221,13 +218,13 @@ impl AuthenticationMiddleware {
     /// Converts "john.test" to "37vuX2XMqtcrobGwxSZJSwJoYyjiH18SiQ.john_test"
     fn transform_username(&self, user: &str, worker: &str) -> String {
         let (from_separator, to_separator) = &self.pool_config.separator;
-        
+
         // Combine user and worker to create the full miner identifier
         let full_miner_username = format!("{}.{}", user, worker);
-        
+
         // Transform the miner username: replace dots with underscores (or configured separator)
         let transformed_worker = full_miner_username.replace(from_separator, to_separator);
-        
+
         // Combine pool username with transformed miner username
         format!("{}.{}", self.pool_config.username, transformed_worker)
     }
@@ -258,18 +255,21 @@ impl Middleware for AuthenticationMiddleware {
                     let client_key = format!("{}:{}", user, worker);
                     let user_clone = user.clone();
                     let worker_clone = worker.clone();
-                    
+
                     // Transform username to pool-compatible format
                     let pool_username = self.transform_username(user, worker);
-                    
+
                     // Simple authentication - accept all for now
                     // TODO: Add actual authentication logic
                     self.authenticated_clients.insert(client_key.clone(), true);
                     context.set_metadata("authenticated".to_string(), "true".to_string());
                     context.set_metadata("auth_key".to_string(), client_key);
                     context.set_metadata("pool_username".to_string(), pool_username.clone());
-                    
-                    info!("Client authenticated: {}.{} (pool format: {})", user_clone, worker_clone, pool_username);
+
+                    info!(
+                        "Client authenticated: {}.{} (pool format: {})",
+                        user_clone, worker_clone, pool_username
+                    );
                 }
                 StratumMessage::Subscribe { .. } => {
                     // Subscribe is allowed without authentication (it's the first message miners send)
@@ -280,10 +280,10 @@ impl Middleware for AuthenticationMiddleware {
                     if let Some(client_id) = &context.client_id {
                         if !self.authenticated_clients.contains_key(client_id) {
                             return Err(StratumError::Protocol {
-                            message: "Client not authenticated".to_string(),
-                            method: None,
-                            request_id: None,
-                        });
+                                message: "Client not authenticated".to_string(),
+                                method: None,
+                                request_id: None,
+                            });
                         }
                     }
                 }
@@ -333,7 +333,10 @@ impl Middleware for LoggingMiddleware {
                 _ => {}
             }
         } else {
-            warn!("Processing message without parsed content: {}", context.raw_message);
+            warn!(
+                "Processing message without parsed content: {}",
+                context.raw_message
+            );
         }
 
         Ok(context)

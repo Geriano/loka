@@ -1,5 +1,5 @@
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use dashmap::DashMap;
 
@@ -85,12 +85,14 @@ impl StringPool {
         // Create new interned string
         let interned_string: Arc<str> = s.into();
         let result = Arc::clone(&interned_string);
-        
+
         self.interned.insert(s.to_string(), interned_string);
-        
+
         self.stats.interned_count.fetch_add(1, Ordering::Relaxed);
         self.stats.misses.fetch_add(1, Ordering::Relaxed);
-        self.stats.memory_saved.fetch_add(s.len() as u64, Ordering::Relaxed);
+        self.stats
+            .memory_saved
+            .fetch_add(s.len() as u64, Ordering::Relaxed);
 
         result
     }
@@ -118,12 +120,14 @@ impl StringPool {
         let memory_saved = s.len() as u64;
         let interned_string: Arc<str> = s.clone().into();
         let result = Arc::clone(&interned_string);
-        
+
         self.interned.insert(s, interned_string);
-        
+
         self.stats.interned_count.fetch_add(1, Ordering::Relaxed);
         self.stats.misses.fetch_add(1, Ordering::Relaxed);
-        self.stats.memory_saved.fetch_add(memory_saved, Ordering::Relaxed);
+        self.stats
+            .memory_saved
+            .fetch_add(memory_saved, Ordering::Relaxed);
 
         result
     }
@@ -173,14 +177,14 @@ impl StringPool {
     fn cleanup_oldest_entries(&self) {
         let target_size = self.config.max_entries * 3 / 4; // Remove 25% of entries
         let current_size = self.interned.len();
-        
+
         if current_size <= target_size {
             return;
         }
 
         let to_remove = current_size - target_size;
         let mut removed = 0;
-        
+
         // Simple cleanup - remove arbitrary entries
         // In production, you might want to track access time for LRU
         self.interned.retain(|_, _| {
@@ -322,11 +326,11 @@ impl StringOptimizer {
     pub fn concat_optimized(parts: &[&str]) -> String {
         let total_len: usize = parts.iter().map(|s| s.len()).sum();
         let mut result = String::with_capacity(total_len);
-        
+
         for part in parts {
             result.push_str(part);
         }
-        
+
         result
     }
 
@@ -335,23 +339,23 @@ impl StringOptimizer {
         if parts.is_empty() {
             return String::new();
         }
-        
+
         if parts.len() == 1 {
             return parts[0].to_string();
         }
 
-        let total_len: usize = parts.iter().map(|s| s.len()).sum::<usize>()
-            + separator.len() * (parts.len() - 1);
-        
+        let total_len: usize =
+            parts.iter().map(|s| s.len()).sum::<usize>() + separator.len() * (parts.len() - 1);
+
         let mut result = String::with_capacity(total_len);
-        
+
         for (i, part) in parts.iter().enumerate() {
             if i > 0 {
                 result.push_str(separator);
             }
             result.push_str(part);
         }
-        
+
         result
     }
 
@@ -364,7 +368,7 @@ impl StringOptimizer {
 
         let new_len = source.len() + count * (to.len().saturating_sub(from.len()));
         let mut result = String::with_capacity(new_len);
-        
+
         let mut last_end = 0;
         for (start, part) in source.match_indices(from) {
             result.push_str(&source[last_end..start]);
@@ -372,7 +376,7 @@ impl StringOptimizer {
             last_end = start + part.len();
         }
         result.push_str(&source[last_end..]);
-        
+
         result
     }
 
@@ -397,10 +401,10 @@ impl StringOptimizer {
         if let Some(start) = json.find(&field_pattern) {
             let value_start = start + field_pattern.len();
             let json_after_field = &json[value_start..];
-            
+
             // Skip whitespace
             let json_after_field = json_after_field.trim_start();
-            
+
             if json_after_field.starts_with('"') {
                 // String value
                 if let Some(end_quote) = json_after_field[1..].find('"') {
@@ -477,7 +481,7 @@ pub struct StringPoolStats {
     pub hit_rate: f64,
 }
 
-/// Thread-local string pools for high-performance single-threaded scenarios
+// Thread-local string pools for high-performance single-threaded scenarios
 thread_local! {
     static LOCAL_POOL: StringPool = StringPool::new();
 }
@@ -499,13 +503,13 @@ mod tests {
     #[test]
     fn test_string_pool_basic() {
         let pool = StringPool::new();
-        
+
         let s1 = pool.intern("hello");
         let s2 = pool.intern("hello");
-        
+
         assert_eq!(s1.as_ref(), s2.as_ref());
         assert!(Arc::ptr_eq(&s1, &s2));
-        
+
         let stats = pool.stats();
         assert_eq!(stats.hits, 1);
         assert_eq!(stats.misses, 1);
@@ -515,7 +519,7 @@ mod tests {
     fn test_string_builder() {
         let mut builder = OptimizedStringBuilder::new();
         builder.push_str("hello").push(' ').push_str("world");
-        
+
         let result = builder.build();
         assert_eq!(result.as_ref(), "hello world");
     }
@@ -525,7 +529,7 @@ mod tests {
         let parts = &["hello", " ", "world"];
         let result = StringOptimizer::concat_optimized(parts);
         assert_eq!(result, "hello world");
-        
+
         let joined = StringOptimizer::join_optimized(parts, "");
         assert_eq!(joined, "hello world");
     }

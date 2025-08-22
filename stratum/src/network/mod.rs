@@ -9,9 +9,16 @@ pub mod proxy;
 pub mod tasks;
 
 // Re-export key types
-pub use connection::{Connection, ConnectionId, ConnectionState, DisconnectReason, ConnectionMetrics};
+pub use connection::{
+    Connection, ConnectionId, ConnectionMetrics, ConnectionState, DisconnectReason,
+};
 pub use handler::NetworkHandler;
 pub use manager::{ConnectionManager, ConnectionManagerConfig, ConnectionManagerStats};
-pub use processors::{CompositeProcessor, LoggingProcessor, LogLevel, StratumProcessor, RateLimitProcessor, MetricsProcessor};
+pub use processors::{
+    CompositeProcessor, LogLevel, LoggingProcessor, MetricsProcessor, RateLimitProcessor,
+    StratumProcessor,
+};
 pub use proxy::{BidirectionalProxy, MessageProcessor, PassThroughProcessor, ProxyBuilder};
-pub use tasks::{TaskManager, TaskHandle, TaskId, TaskCategory, TaskMetadata, TaskManagerStatistics};
+pub use tasks::{
+    TaskCategory, TaskHandle, TaskId, TaskManager, TaskManagerStatistics, TaskMetadata,
+};

@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 use std::net::SocketAddr;
-use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 
 use tokio::net::TcpStream;
@@ -116,7 +116,7 @@ pub struct ConnectionPool {
 impl ConnectionPool {
     pub fn new(target_addr: SocketAddr, config: PoolConfig) -> Self {
         let semaphore = Arc::new(Semaphore::new(config.max_connections));
-        
+
         Self {
             config: config.clone(),
             target_addr,
@@ -132,7 +132,11 @@ impl ConnectionPool {
 
     /// Start the connection pool with background maintenance
     pub async fn start(&self) -> Result<()> {
-        if self.is_running.compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed).is_err() {
+        if self
+            .is_running
+            .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
+            .is_err()
+        {
             return Err(StratumError::Internal {
                 message: "Connection pool is already running".to_string(),
             });
@@ -166,14 +170,21 @@ impl ConnectionPool {
 
     /// Get a connection from the pool
     pub async fn get_connection(&self) -> Result<ManagedConnection> {
-        let _permit = self.semaphore.acquire().await.map_err(|_| StratumError::Internal {
-            message: "Failed to acquire connection permit".to_string(),
-        })?;
+        let _permit = self
+            .semaphore
+            .acquire()
+            .await
+            .map_err(|_| StratumError::Internal {
+                message: "Failed to acquire connection permit".to_string(),
+            })?;
 
         // Try to get existing connection first
         if let Some(connection) = self.try_get_existing_connection().await? {
             self.total_reused.fetch_add(1, Ordering::Relaxed);
-            return Ok(ManagedConnection::new(connection, Arc::clone(&self.connections)));
+            return Ok(ManagedConnection::new(
+                connection,
+                Arc::clone(&self.connections),
+            ));
         }
 
         // Create new connection
@@ -181,7 +192,10 @@ impl ConnectionPool {
             Ok(connection) => {
                 self.total_created.fetch_add(1, Ordering::Relaxed);
                 self.active_connections.fetch_add(1, Ordering::Relaxed);
-                Ok(ManagedConnection::new(connection, Arc::clone(&self.connections)))
+                Ok(ManagedConnection::new(
+                    connection,
+                    Arc::clone(&self.connections),
+                ))
             }
             Err(e) => {
                 self.total_errors.fetch_add(1, Ordering::Relaxed);
@@ -193,7 +207,7 @@ impl ConnectionPool {
     /// Try to get an existing connection from the pool
     async fn try_get_existing_connection(&self) -> Result<Option<TcpStream>> {
         let mut connections = self.connections.lock().await;
-        
+
         while let Some(mut pooled_conn) = connections.pop_front() {
             if pooled_conn.is_available() && !pooled_conn.is_expired(self.config.idle_timeout) {
                 if let Some(connection) = pooled_conn.take_connection() {
@@ -216,17 +230,31 @@ impl ConnectionPool {
         let mut _last_error = None;
 
         for attempt in 1..=self.config.retry_attempts {
-            match timeout(self.config.connection_timeout, TcpStream::connect(self.target_addr)).await {
+            match timeout(
+                self.config.connection_timeout,
+                TcpStream::connect(self.target_addr),
+            )
+            .await
+            {
                 Ok(Ok(stream)) => {
-                    debug!("Created new connection to {} (attempt {})", self.target_addr, attempt);
+                    debug!(
+                        "Created new connection to {} (attempt {})",
+                        self.target_addr, attempt
+                    );
                     return Ok(stream);
                 }
                 Ok(Err(e)) => {
-                    warn!("Failed to connect to {} (attempt {}): {}", self.target_addr, attempt, e);
+                    warn!(
+                        "Failed to connect to {} (attempt {}): {}",
+                        self.target_addr, attempt, e
+                    );
                     _last_error = Some(e);
                 }
                 Err(_) => {
-                    warn!("Connection timeout to {} (attempt {})", self.target_addr, attempt);
+                    warn!(
+                        "Connection timeout to {} (attempt {})",
+                        self.target_addr, attempt
+                    );
                     _last_error = Some(std::io::Error::new(
                         std::io::ErrorKind::TimedOut,
                         "Connection timeout",
@@ -254,19 +282,19 @@ impl ConnectionPool {
         true
     }
 
-    /// Return a connection to the pool
-    async fn return_connection(&self, connection: TcpStream) {
-        let mut connections = self.connections.lock().await;
-        
-        if connections.len() < self.config.max_connections {
-            let pooled = PooledConnection::new(connection, self.target_addr);
-            connections.push_back(pooled);
-        } else {
-            // Pool is full, just drop the connection
-            drop(connection);
-            self.active_connections.fetch_sub(1, Ordering::Relaxed);
-        }
-    }
+    // /// Return a connection to the pool
+    // async fn return_connection(&self, connection: TcpStream) {
+    //     let mut connections = self.connections.lock().await;
+
+    //     if connections.len() < self.config.max_connections {
+    //         let pooled = PooledConnection::new(connection, self.target_addr);
+    //         connections.push_back(pooled);
+    //     } else {
+    //         // Pool is full, just drop the connection
+    //         drop(connection);
+    //         self.active_connections.fetch_sub(1, Ordering::Relaxed);
+    //     }
+    // }
 
     /// Ensure minimum number of connections are available
     async fn ensure_minimum_connections(&self) -> Result<()> {
@@ -276,7 +304,7 @@ impl ConnectionPool {
         };
 
         let needed = self.config.min_connections.saturating_sub(current_count);
-        
+
         for _ in 0..needed {
             match self.create_new_connection().await {
                 Ok(connection) => {
@@ -295,16 +323,17 @@ impl ConnectionPool {
         Ok(())
     }
 
-    /// Background maintenance loop
-    async fn maintenance_loop(&self) {
-        while self.is_running.load(Ordering::Acquire) {
-            self.cleanup_expired_connections().await;
-            self.ensure_minimum_connections().await.ok();
-            sleep(self.config.validation_interval).await;
-        }
-    }
+    // /// Background maintenance loop
+    // async fn maintenance_loop(&self) {
+    //     while self.is_running.load(Ordering::Acquire) {
+    //         self.cleanup_expired_connections().await;
+    //         self.ensure_minimum_connections().await.ok();
+    //         sleep(self.config.validation_interval).await;
+    //     }
+    // }
 
     /// Clean up expired connections
+    #[allow(unused)]
     async fn cleanup_expired_connections(&self) {
         let mut connections = self.connections.lock().await;
         let mut to_remove = Vec::new();
@@ -329,7 +358,8 @@ impl ConnectionPool {
     pub async fn get_stats(&self) -> PoolStats {
         let connections = self.connections.lock().await;
         let available_connections = connections.iter().filter(|c| c.is_available()).count();
-        let expired_connections = connections.iter()
+        let expired_connections = connections
+            .iter()
             .filter(|c| c.is_expired(self.config.idle_timeout))
             .count();
 
@@ -351,7 +381,9 @@ impl ConnectionPool {
         ConnectionPoolMaintenance {
             config: self.config.clone(),
             connections: Arc::clone(&self.connections),
-            active_connections: Arc::new(AtomicUsize::new(self.active_connections.load(Ordering::Relaxed))),
+            active_connections: Arc::new(AtomicUsize::new(
+                self.active_connections.load(Ordering::Relaxed),
+            )),
             is_running: Arc::clone(&self.is_running),
             target_addr: self.target_addr,
         }
@@ -365,6 +397,7 @@ struct ConnectionPoolMaintenance {
     connections: Arc<Mutex<VecDeque<PooledConnection>>>,
     active_connections: Arc<AtomicUsize>,
     is_running: Arc<AtomicBool>,
+    #[allow(unused)]
     target_addr: SocketAddr,
 }
 
@@ -430,8 +463,9 @@ impl Drop for ManagedConnection {
     fn drop(&mut self) {
         if let Some(connection) = self.connection.take() {
             let pool = Arc::clone(&self.pool);
-            let peer_addr = connection.peer_addr().unwrap_or_else(|_| 
-                "0.0.0.0:0".parse().unwrap());
+            let peer_addr = connection
+                .peer_addr()
+                .unwrap_or_else(|_| "0.0.0.0:0".parse().unwrap());
             tokio::spawn(async move {
                 let mut connections = pool.lock().await;
                 let pooled = PooledConnection::new(connection, peer_addr);
@@ -477,7 +511,11 @@ impl ResourceManager {
 
     /// Start the resource manager
     pub async fn start(&self) -> Result<()> {
-        if self.is_running.compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed).is_err() {
+        if self
+            .is_running
+            .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
+            .is_err()
+        {
             return Err(StratumError::Internal {
                 message: "Resource manager is already running".to_string(),
             });
@@ -551,7 +589,9 @@ struct ResourceManagerMonitor {
     cleanup_interval: Duration,
     is_running: Arc<AtomicBool>,
     cleanup_callbacks: Arc<RwLock<Vec<Box<dyn Fn() + Send + Sync>>>>,
+    #[allow(unused)]
     memory_pressure_threshold: f64,
+    #[allow(unused)]
     cpu_pressure_threshold: f64,
 }
 

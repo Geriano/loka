@@ -1,20 +1,20 @@
+use async_trait::async_trait;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use async_trait::async_trait;
-use tracing::{debug, error, info, warn};
 use tokio::time::sleep;
+use tracing::{debug, error, info, warn};
 
-use super::types::{StratumError, ErrorAction, ErrorSeverity, Result};
+use super::types::{ErrorAction, ErrorSeverity, Result, StratumError};
 
 /// Trait for handling errors in the Stratum system
 #[async_trait]
 pub trait ErrorHandler: Send + Sync {
     /// Handle an error and return the recommended action
     async fn handle_error(&self, error: &StratumError, context: &ErrorContext) -> ErrorAction;
-    
+
     /// Check if the error handler can handle this specific error type
     fn can_handle(&self, error: &StratumError) -> bool;
-    
+
     /// Get the priority of this error handler (higher values = higher priority)
     fn priority(&self) -> u32 {
         100
@@ -47,28 +47,28 @@ impl ErrorContext {
             max_attempts: 3,
         }
     }
-    
+
     pub fn with_remote_addr(mut self, addr: std::net::SocketAddr) -> Self {
         self.remote_addr = Some(addr);
         self
     }
-    
+
     pub fn with_user(mut self, user_id: String) -> Self {
         self.user_id = Some(user_id);
         self
     }
-    
+
     pub fn with_request_id(mut self, request_id: String) -> Self {
         self.request_id = Some(request_id);
         self
     }
-    
+
     pub fn with_attempt_info(mut self, attempt_count: u32, max_attempts: u32) -> Self {
         self.attempt_count = attempt_count;
         self.max_attempts = max_attempts;
         self
     }
-    
+
     pub fn should_retry(&self) -> bool {
         self.attempt_count < self.max_attempts
     }
@@ -90,7 +90,7 @@ impl DefaultErrorHandler {
             max_delay: Duration::from_secs(30),
         }
     }
-    
+
     pub fn with_retry_config(
         mut self,
         max_retries: u32,
@@ -102,8 +102,9 @@ impl DefaultErrorHandler {
         self.max_delay = max_delay;
         self
     }
-    
+
     /// Calculate exponential backoff delay
+    #[allow(unused)]
     fn calculate_delay(&self, attempt: u32) -> Duration {
         let delay = self.base_delay * 2_u32.pow(attempt.saturating_sub(1));
         std::cmp::min(delay, self.max_delay)
@@ -120,7 +121,7 @@ impl Default for DefaultErrorHandler {
 impl ErrorHandler for DefaultErrorHandler {
     async fn handle_error(&self, error: &StratumError, context: &ErrorContext) -> ErrorAction {
         let severity = error.severity();
-        
+
         // Log the error with appropriate level
         match severity {
             ErrorSeverity::Critical => {
@@ -132,7 +133,7 @@ impl ErrorHandler for DefaultErrorHandler {
                     user_id = ?context.user_id,
                     "Critical error occurred"
                 );
-            },
+            }
             ErrorSeverity::High => {
                 error!(
                     error = %error,
@@ -140,7 +141,7 @@ impl ErrorHandler for DefaultErrorHandler {
                     operation = context.operation,
                     "High severity error"
                 );
-            },
+            }
             ErrorSeverity::Medium => {
                 warn!(
                     error = %error,
@@ -148,7 +149,7 @@ impl ErrorHandler for DefaultErrorHandler {
                     operation = context.operation,
                     "Medium severity error"
                 );
-            },
+            }
             ErrorSeverity::Low => {
                 debug!(
                     error = %error,
@@ -156,12 +157,12 @@ impl ErrorHandler for DefaultErrorHandler {
                     operation = context.operation,
                     "Low severity error"
                 );
-            },
+            }
         }
-        
+
         // Return error's recommended action, but override for retryable errors
         let recommended = error.recommended_action();
-        
+
         match recommended {
             ErrorAction::Retry { .. } if context.should_retry() && error.is_retryable() => {
                 ErrorAction::Retry {
@@ -169,15 +170,15 @@ impl ErrorHandler for DefaultErrorHandler {
                     base_delay: self.base_delay,
                     max_delay: self.max_delay,
                 }
-            },
+            }
             _ => recommended,
         }
     }
-    
+
     fn can_handle(&self, _error: &StratumError) -> bool {
         true // Default handler can handle any error
     }
-    
+
     fn priority(&self) -> u32 {
         0 // Lowest priority
     }
@@ -197,12 +198,8 @@ impl NetworkErrorHandler {
             max_connection_retries: 3,
         }
     }
-    
-    pub fn with_connection_config(
-        mut self,
-        timeout: Duration,
-        max_retries: u32,
-    ) -> Self {
+
+    pub fn with_connection_config(mut self, timeout: Duration, max_retries: u32) -> Self {
         self.connection_timeout = timeout;
         self.max_connection_retries = max_retries;
         self
@@ -226,7 +223,7 @@ impl ErrorHandler for NetworkErrorHandler {
                     remote_addr = ?context.remote_addr,
                     "Network error detected"
                 );
-                
+
                 if context.attempt_count < self.max_connection_retries {
                     ErrorAction::Retry {
                         max_attempts: self.max_connection_retries,
@@ -236,22 +233,22 @@ impl ErrorHandler for NetworkErrorHandler {
                 } else {
                     ErrorAction::Terminate
                 }
-            },
-            
+            }
+
             StratumError::ConnectionTimeout { .. } => {
                 info!(
                     component = context.component,
                     timeout = ?self.connection_timeout,
                     "Connection timeout, will retry with longer timeout"
                 );
-                
+
                 ErrorAction::Retry {
                     max_attempts: 2,
                     base_delay: Duration::from_secs(1),
                     max_delay: Duration::from_secs(5),
                 }
-            },
-            
+            }
+
             StratumError::ConnectionLimitExceeded { current, max } => {
                 warn!(
                     current = current,
@@ -259,21 +256,22 @@ impl ErrorHandler for NetworkErrorHandler {
                     "Connection limit exceeded, terminating connection"
                 );
                 ErrorAction::Terminate
-            },
-            
+            }
+
             _ => ErrorAction::Escalate,
         }
     }
-    
+
     fn can_handle(&self, error: &StratumError) -> bool {
-        matches!(error,
-            StratumError::Network { .. } |
-            StratumError::Connection { .. } |
-            StratumError::ConnectionTimeout { .. } |
-            StratumError::ConnectionLimitExceeded { .. }
+        matches!(
+            error,
+            StratumError::Network { .. }
+                | StratumError::Connection { .. }
+                | StratumError::ConnectionTimeout { .. }
+                | StratumError::ConnectionLimitExceeded { .. }
         )
     }
-    
+
     fn priority(&self) -> u32 {
         200 // High priority for network errors
     }
@@ -293,12 +291,8 @@ impl SecurityErrorHandler {
             max_violations: 5,
         }
     }
-    
-    pub fn with_security_config(
-        mut self,
-        ban_duration: Duration,
-        max_violations: u32,
-    ) -> Self {
+
+    pub fn with_security_config(mut self, ban_duration: Duration, max_violations: u32) -> Self {
         self.ban_duration = ban_duration;
         self.max_violations = max_violations;
         self
@@ -324,19 +318,23 @@ impl ErrorHandler for SecurityErrorHandler {
                     user_id = ?context.user_id,
                     "Security violation detected"
                 );
-                
+
                 // Immediate termination for security violations
                 ErrorAction::Terminate
-            },
-            
-            StratumError::Authentication { reason, username, remote_addr } => {
+            }
+
+            StratumError::Authentication {
+                reason,
+                username,
+                remote_addr,
+            } => {
                 warn!(
                     reason = reason,
                     username = ?username,
                     remote_addr = ?remote_addr,
                     "Authentication failure"
                 );
-                
+
                 // For auth failures, implement progressive backoff
                 if context.attempt_count >= 3 {
                     ErrorAction::CircuitBreaker {
@@ -350,9 +348,13 @@ impl ErrorHandler for SecurityErrorHandler {
                         max_delay: Duration::from_secs(10),
                     }
                 }
-            },
-            
-            StratumError::RateLimitExceeded { limit, window, retry_after } => {
+            }
+
+            StratumError::RateLimitExceeded {
+                limit,
+                window,
+                retry_after,
+            } => {
                 info!(
                     limit = limit,
                     window = ?window,
@@ -360,27 +362,28 @@ impl ErrorHandler for SecurityErrorHandler {
                     remote_addr = ?context.remote_addr,
                     "Rate limit exceeded"
                 );
-                
+
                 ErrorAction::CircuitBreaker {
                     duration: *retry_after,
                     message: "Rate limit exceeded".to_string(),
                 }
-            },
-            
+            }
+
             _ => ErrorAction::Escalate,
         }
     }
-    
+
     fn can_handle(&self, error: &StratumError) -> bool {
-        matches!(error,
-            StratumError::SecurityViolation { .. } |
-            StratumError::Authentication { .. } |
-            StratumError::Authorization { .. } |
-            StratumError::RateLimitExceeded { .. } |
-            StratumError::ValidationFailed { .. }
+        matches!(
+            error,
+            StratumError::SecurityViolation { .. }
+                | StratumError::Authentication { .. }
+                | StratumError::Authorization { .. }
+                | StratumError::RateLimitExceeded { .. }
+                | StratumError::ValidationFailed { .. }
         )
     }
-    
+
     fn priority(&self) -> u32 {
         300 // Highest priority for security errors
     }
@@ -405,14 +408,15 @@ impl CompositeErrorHandler {
             handlers: Vec::new(),
         }
     }
-    
+
     pub fn with_handler(mut self, handler: Arc<dyn ErrorHandler>) -> Self {
         self.handlers.push(handler);
         // Sort by priority (highest first)
-        self.handlers.sort_by_key(|h| std::cmp::Reverse(h.priority()));
+        self.handlers
+            .sort_by_key(|h| std::cmp::Reverse(h.priority()));
         self
     }
-    
+
     pub fn with_default_handlers() -> Self {
         Self::new()
             .with_handler(Arc::new(SecurityErrorHandler::new()))
@@ -434,18 +438,18 @@ impl ErrorHandler for CompositeErrorHandler {
         for handler in &self.handlers {
             if handler.can_handle(error) {
                 let action = handler.handle_error(error, context).await;
-                
+
                 debug!(
                     handler = std::any::type_name_of_val(handler.as_ref()),
                     action = ?action,
                     error = %error,
                     "Error handled by specialized handler"
                 );
-                
+
                 return action;
             }
         }
-        
+
         // If no handler can handle it, terminate by default
         warn!(
             error = %error,
@@ -453,13 +457,17 @@ impl ErrorHandler for CompositeErrorHandler {
         );
         ErrorAction::Terminate
     }
-    
+
     fn can_handle(&self, error: &StratumError) -> bool {
         self.handlers.iter().any(|h| h.can_handle(error))
     }
-    
+
     fn priority(&self) -> u32 {
-        self.handlers.iter().map(|h| h.priority()).max().unwrap_or(0)
+        self.handlers
+            .iter()
+            .map(|h| h.priority())
+            .max()
+            .unwrap_or(0)
     }
 }
 
@@ -472,7 +480,7 @@ impl ErrorRecovery {
     pub fn new(handler: Arc<dyn ErrorHandler>) -> Self {
         Self { handler }
     }
-    
+
     /// Execute an operation with automatic error recovery
     pub async fn execute_with_recovery<F, Fut, T>(
         &self,
@@ -486,10 +494,10 @@ impl ErrorRecovery {
     {
         let mut current_context = context;
         let start_time = Instant::now();
-        
+
         loop {
             current_context.attempt_count += 1;
-            
+
             match operation().await {
                 Ok(result) => {
                     if current_context.attempt_count > 1 {
@@ -502,12 +510,16 @@ impl ErrorRecovery {
                         );
                     }
                     return Ok(result);
-                },
+                }
                 Err(error) => {
                     let action = self.handler.handle_error(&error, &current_context).await;
-                    
+
                     match action {
-                        ErrorAction::Retry { max_attempts, base_delay, max_delay } => {
+                        ErrorAction::Retry {
+                            max_attempts,
+                            base_delay,
+                            max_delay,
+                        } => {
                             if current_context.attempt_count >= max_attempts {
                                 error!(
                                     error = %error,
@@ -517,41 +529,38 @@ impl ErrorRecovery {
                                 );
                                 return Err(error);
                             }
-                            
+
                             // Calculate delay with exponential backoff
                             let attempt = current_context.attempt_count.saturating_sub(1);
-                            let delay = std::cmp::min(
-                                base_delay * 2_u32.pow(attempt),
-                                max_delay
-                            );
-                            
+                            let delay = std::cmp::min(base_delay * 2_u32.pow(attempt), max_delay);
+
                             debug!(
                                 attempt = current_context.attempt_count,
                                 max_attempts = max_attempts,
                                 delay = ?delay,
                                 "Retrying operation after error"
                             );
-                            
+
                             sleep(delay).await;
                             continue;
-                        },
-                        
+                        }
+
                         ErrorAction::CircuitBreaker { duration, message } => {
                             warn!(
                                 duration = ?duration,
                                 message = message,
                                 "Circuit breaker activated"
                             );
-                            
+
                             sleep(duration).await;
                             return Err(error);
-                        },
-                        
+                        }
+
                         ErrorAction::Terminate => {
                             debug!("Error handler recommended termination");
                             return Err(error);
-                        },
-                        
+                        }
+
                         ErrorAction::Ignore => {
                             warn!(
                                 error = %error,
@@ -559,23 +568,20 @@ impl ErrorRecovery {
                             );
                             // Return a default value or continue - this depends on the operation
                             return Err(error);
-                        },
-                        
+                        }
+
                         ErrorAction::Escalate => {
                             error!(
                                 error = %error,
                                 "Error escalated - no recovery possible"
                             );
                             return Err(error);
-                        },
-                        
+                        }
+
                         ErrorAction::Fallback { message } => {
-                            warn!(
-                                message = message,
-                                "Falling back to default behavior"
-                            );
+                            warn!(message = message, "Falling back to default behavior");
                             return Err(error);
-                        },
+                        }
                     }
                 }
             }
@@ -587,66 +593,66 @@ impl ErrorRecovery {
 mod tests {
     use super::*;
     use std::net::SocketAddr;
-    
+
     #[tokio::test]
     async fn test_default_error_handler() {
         let handler = DefaultErrorHandler::new();
         let context = ErrorContext::new("test", "test_operation");
-        
+
         let error = StratumError::Network {
             message: "Connection refused".to_string(),
             source: None,
         };
-        
+
         let action = handler.handle_error(&error, &context).await;
-        
+
         match action {
             ErrorAction::Retry { max_attempts, .. } => {
                 assert_eq!(max_attempts, 3);
-            },
+            }
             _ => panic!("Expected retry action"),
         }
     }
-    
+
     #[tokio::test]
     async fn test_security_error_handler() {
         let handler = SecurityErrorHandler::new();
         let context = ErrorContext::new("auth", "authenticate")
             .with_remote_addr("127.0.0.1:1234".parse().unwrap());
-        
+
         let error = StratumError::Authentication {
             reason: "Invalid password".to_string(),
             username: Some("test_user".to_string()),
             remote_addr: Some("127.0.0.1:1234".parse().unwrap()),
         };
-        
+
         let action = handler.handle_error(&error, &context).await;
-        
+
         match action {
             ErrorAction::Retry { max_attempts, .. } => {
                 assert_eq!(max_attempts, 3);
-            },
+            }
             _ => panic!("Expected retry action"),
         }
     }
-    
+
     #[tokio::test]
     async fn test_composite_error_handler() {
         let handler = CompositeErrorHandler::with_default_handlers();
         let context = ErrorContext::new("network", "connect");
-        
+
         let error = StratumError::Network {
             message: "Connection timeout".to_string(),
             source: None,
         };
-        
+
         let action = handler.handle_error(&error, &context).await;
-        
+
         // Should be handled by NetworkErrorHandler
         match action {
             ErrorAction::Retry { .. } | ErrorAction::Terminate => {
                 // Either is acceptable
-            },
+            }
             _ => panic!("Expected retry or terminate action"),
         }
     }

@@ -45,7 +45,10 @@ mod integration_tests {
 
         // Run simulation with timeout
         let result = timeout(Duration::from_secs(5), simulator.run()).await;
-        assert!(result.is_ok(), "Miner simulation should complete successfully");
+        assert!(
+            result.is_ok(),
+            "Miner simulation should complete successfully"
+        );
 
         pool_handle.shutdown().await.unwrap();
     }
@@ -90,7 +93,10 @@ mod integration_tests {
         let simulator = MinerSimulator::new(miner_config);
 
         let result = timeout(Duration::from_secs(8), simulator.run()).await;
-        assert!(result.is_ok(), "Multi-worker miner simulation should complete successfully");
+        assert!(
+            result.is_ok(),
+            "Multi-worker miner simulation should complete successfully"
+        );
 
         pool_handle.shutdown().await.unwrap();
     }
@@ -121,7 +127,7 @@ mod integration_tests {
             password: "stalepass".to_string(),
             worker_prefix: "stale".to_string(),
             share_interval_secs: 0.8,
-            stale_rate: 0.2, // 20% stale rate
+            stale_rate: 0.2,    // 20% stale rate
             invalid_rate: 0.05, // 5% invalid rate
             duration_secs: 3,
             connection_timeout_secs: 5,
@@ -135,7 +141,10 @@ mod integration_tests {
         let simulator = MinerSimulator::new(miner_config);
 
         let result = timeout(Duration::from_secs(8), simulator.run()).await;
-        assert!(result.is_ok(), "Stale shares miner simulation should complete successfully");
+        assert!(
+            result.is_ok(),
+            "Stale shares miner simulation should complete successfully"
+        );
 
         pool_handle.shutdown().await.unwrap();
     }
@@ -180,7 +189,10 @@ mod integration_tests {
         let simulator = MinerSimulator::new(miner_config);
 
         let result = timeout(Duration::from_secs(10), simulator.run()).await;
-        assert!(result.is_ok(), "Vardiff miner simulation should complete successfully");
+        assert!(
+            result.is_ok(),
+            "Vardiff miner simulation should complete successfully"
+        );
 
         pool_handle.shutdown().await.unwrap();
     }
@@ -225,7 +237,10 @@ mod integration_tests {
         let simulator = MinerSimulator::new(miner_config);
 
         let result = timeout(Duration::from_secs(8), simulator.run()).await;
-        assert!(result.is_ok(), "High hashrate miner simulation should complete successfully");
+        assert!(
+            result.is_ok(),
+            "High hashrate miner simulation should complete successfully"
+        );
 
         pool_handle.shutdown().await.unwrap();
     }
@@ -270,7 +285,10 @@ mod integration_tests {
         let simulator = MinerSimulator::new(miner_config);
 
         let result = timeout(Duration::from_secs(12), simulator.run()).await;
-        assert!(result.is_ok(), "Reconnection miner simulation should complete successfully");
+        assert!(
+            result.is_ok(),
+            "Reconnection miner simulation should complete successfully"
+        );
 
         pool_handle.shutdown().await.unwrap();
     }
@@ -374,7 +392,10 @@ mod integration_tests {
 
         // Run simulation to collect statistics
         let result = timeout(Duration::from_secs(8), simulator.run()).await;
-        assert!(result.is_ok(), "Statistics collection miner simulation should complete successfully");
+        assert!(
+            result.is_ok(),
+            "Statistics collection miner simulation should complete successfully"
+        );
 
         pool_handle.shutdown().await.unwrap();
     }
@@ -385,6 +406,8 @@ mod disabled_tests {
     #[test]
     fn test_miner_integration_requires_features() {
         // This test ensures the integration tests are only run when both features are enabled
-        println!("Mock miner integration tests require both 'mock-miner' and 'mock-pool' features to be enabled");
+        println!(
+            "Mock miner integration tests require both 'mock-miner' and 'mock-pool' features to be enabled"
+        );
     }
 }

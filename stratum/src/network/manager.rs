@@ -62,15 +62,15 @@ impl ConnectionManager {
     /// Start background tasks for connection management
     pub async fn start_background_tasks(&self) -> Result<()> {
         let mut tasks = self.tasks.write().await;
-        
+
         // Start cleanup task
         let cleanup_task = self.start_cleanup_task();
         tasks.push(cleanup_task);
-        
+
         // Start statistics task
         let stats_task = self.start_stats_task();
         tasks.push(stats_task);
-        
+
         info!("Connection manager background tasks started");
         Ok(())
     }
@@ -78,11 +78,11 @@ impl ConnectionManager {
     /// Stop all background tasks
     pub async fn stop_background_tasks(&self) {
         let mut tasks = self.tasks.write().await;
-        
+
         for task in tasks.drain(..) {
             task.abort();
         }
-        
+
         info!("Connection manager background tasks stopped");
     }
 
@@ -90,8 +90,11 @@ impl ConnectionManager {
     pub async fn register_connection(&self, remote_addr: SocketAddr) -> Result<Arc<Connection>> {
         // Check connection limit
         if self.connections.len() >= self.config.max_connections {
-            warn!("Connection limit reached: {}/{}", 
-                  self.connections.len(), self.config.max_connections);
+            warn!(
+                "Connection limit reached: {}/{}",
+                self.connections.len(),
+                self.config.max_connections
+            );
             return Err(crate::error::StratumError::ConnectionLimitExceeded {
                 current: self.connections.len(),
                 max: self.config.max_connections,
@@ -101,8 +104,13 @@ impl ConnectionManager {
         // Check for existing connection from same address
         if let Some(existing_id) = self.addr_to_connection.get(&remote_addr) {
             if let Some(existing_conn) = self.connections.get(&existing_id) {
-                warn!("Duplicate connection attempt from {}, closing existing", remote_addr);
-                existing_conn.disconnect(DisconnectReason::ClientDisconnect).await;
+                warn!(
+                    "Duplicate connection attempt from {}, closing existing",
+                    remote_addr
+                );
+                existing_conn
+                    .disconnect(DisconnectReason::ClientDisconnect)
+                    .await;
                 self.unregister_connection(existing_conn.id()).await;
             }
         }
@@ -115,7 +123,10 @@ impl ConnectionManager {
         self.connections.insert(connection_id, connection.clone());
         self.addr_to_connection.insert(remote_addr, connection_id);
 
-        info!("Registered new connection: {} from {}", connection_id, remote_addr);
+        info!(
+            "Registered new connection: {} from {}",
+            connection_id, remote_addr
+        );
         Ok(connection)
     }
 
@@ -124,22 +135,30 @@ impl ConnectionManager {
         if let Some((_, connection)) = self.connections.remove(&connection_id) {
             let remote_addr = connection.remote_addr();
             self.addr_to_connection.remove(&remote_addr);
-            
+
             // Mark as disconnected if not already
-            connection.mark_disconnected(DisconnectReason::ClientDisconnect).await;
-            
-            debug!("Unregistered connection: {} from {}", connection_id, remote_addr);
+            connection
+                .mark_disconnected(DisconnectReason::ClientDisconnect)
+                .await;
+
+            debug!(
+                "Unregistered connection: {} from {}",
+                connection_id, remote_addr
+            );
         }
     }
 
     /// Get a connection by ID
     pub fn get_connection(&self, connection_id: ConnectionId) -> Option<Arc<Connection>> {
-        self.connections.get(&connection_id).map(|entry| entry.clone())
+        self.connections
+            .get(&connection_id)
+            .map(|entry| entry.clone())
     }
 
     /// Get a connection by remote address
     pub fn get_connection_by_addr(&self, remote_addr: SocketAddr) -> Option<Arc<Connection>> {
-        self.addr_to_connection.get(&remote_addr)
+        self.addr_to_connection
+            .get(&remote_addr)
             .and_then(|entry| self.connections.get(&entry).map(|conn| conn.clone()))
     }
 
@@ -156,22 +175,26 @@ impl ConnectionManager {
     /// Get connections by state
     pub async fn get_authenticated_connections(&self) -> Vec<Arc<Connection>> {
         let mut authenticated = Vec::new();
-        
+
         for connection in self.connections.iter() {
             if connection.is_authenticated().await {
                 authenticated.push(connection.clone());
             }
         }
-        
+
         authenticated
     }
 
     /// Force disconnect all connections
     pub async fn disconnect_all(&self, reason: DisconnectReason) {
         let connections: Vec<_> = self.connections.iter().map(|entry| entry.clone()).collect();
-        
-        info!("Disconnecting all {} connections: {}", connections.len(), reason);
-        
+
+        info!(
+            "Disconnecting all {} connections: {}",
+            connections.len(),
+            reason
+        );
+
         for connection in connections {
             connection.disconnect(reason.clone()).await;
         }
@@ -180,38 +203,38 @@ impl ConnectionManager {
     /// Cleanup idle and terminated connections
     pub async fn cleanup_connections(&self) -> usize {
         let mut to_remove = Vec::new();
-        
+
         for entry in self.connections.iter() {
             let connection = entry.value();
-            
+
             if let Some(reason) = connection.should_terminate(self.config.idle_timeout).await {
                 to_remove.push((connection.id(), reason));
             }
         }
-        
+
         let cleanup_count = to_remove.len();
-        
+
         for (connection_id, reason) in to_remove {
             if let Some(connection) = self.get_connection(connection_id) {
                 connection.mark_disconnected(reason).await;
                 self.unregister_connection(connection_id).await;
             }
         }
-        
+
         if cleanup_count > 0 {
             debug!("Cleaned up {} idle/terminated connections", cleanup_count);
         }
-        
+
         cleanup_count
     }
 
     /// Get manager statistics
     pub async fn get_stats(&self) -> ConnectionManagerStats {
         let mut stats = ConnectionManagerStats::default();
-        
+
         for connection in self.connections.iter() {
             let connection_metrics = connection.metrics().await;
-            
+
             stats.total_connections += 1;
             stats.total_messages_received += connection_metrics.messages_received;
             stats.total_messages_sent += connection_metrics.messages_sent;
@@ -222,31 +245,31 @@ impl ConnectionManager {
             stats.total_share_submissions += connection_metrics.share_submissions;
             stats.total_accepted_shares += connection_metrics.accepted_shares;
             stats.total_rejected_shares += connection_metrics.rejected_shares;
-            
+
             if connection.is_authenticated().await {
                 stats.authenticated_connections += 1;
             }
         }
-        
+
         stats.max_connections = self.config.max_connections;
         stats.utilization_percentage = if self.config.max_connections > 0 {
             (stats.total_connections as f64 / self.config.max_connections as f64) * 100.0
         } else {
             0.0
         };
-        
+
         stats.acceptance_rate = if stats.total_share_submissions > 0 {
             (stats.total_accepted_shares as f64 / stats.total_share_submissions as f64) * 100.0
         } else {
             0.0
         };
-        
+
         stats.auth_success_rate = if stats.total_auth_attempts > 0 {
             (stats.total_auth_successes as f64 / stats.total_auth_attempts as f64) * 100.0
         } else {
             0.0
         };
-        
+
         stats
     }
 
@@ -255,23 +278,23 @@ impl ConnectionManager {
         let connections = self.connections.clone();
         let addr_to_connection = self.addr_to_connection.clone();
         let config = self.config.clone();
-        
+
         tokio::spawn(async move {
             let mut cleanup_interval = interval(config.cleanup_interval);
-            
+
             loop {
                 cleanup_interval.tick().await;
-                
+
                 let mut to_remove = Vec::new();
-                
+
                 for entry in connections.iter() {
                     let connection = entry.value();
-                    
+
                     if let Some(reason) = connection.should_terminate(config.idle_timeout).await {
                         to_remove.push((connection.id(), connection.remote_addr(), reason));
                     }
                 }
-                
+
                 for (connection_id, remote_addr, reason) in to_remove {
                     if let Some((_, connection)) = connections.remove(&connection_id) {
                         addr_to_connection.remove(&remote_addr);
@@ -292,15 +315,15 @@ impl ConnectionManager {
             config: self.config.clone(),
             tasks: RwLock::new(Vec::new()),
         };
-        
+
         tokio::spawn(async move {
             let mut stats_interval = interval(manager.config.stats_interval);
-            
+
             loop {
                 stats_interval.tick().await;
-                
+
                 let stats = manager.get_stats().await;
-                
+
                 info!(
                     "Connection Stats: {} active ({:.1}% capacity), {} authenticated, {:.1}% acceptance rate",
                     stats.total_connections,
@@ -308,7 +331,7 @@ impl ConnectionManager {
                     stats.authenticated_connections,
                     stats.acceptance_rate
                 );
-                
+
                 debug!("Detailed stats: {:?}", stats);
             }
         })
@@ -318,8 +341,10 @@ impl ConnectionManager {
 impl Drop for ConnectionManager {
     fn drop(&mut self) {
         // Note: Can't use async in Drop, so we just log
-        info!("Connection manager dropping with {} active connections", 
-              self.connections.len());
+        info!(
+            "Connection manager dropping with {} active connections",
+            self.connections.len()
+        );
     }
 }
 

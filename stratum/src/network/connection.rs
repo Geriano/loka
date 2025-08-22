@@ -231,7 +231,10 @@ impl Connection {
 
     /// Check if connection is authenticated
     pub async fn is_authenticated(&self) -> bool {
-        matches!(*self.state.read().await, ConnectionState::Authenticated { .. })
+        matches!(
+            *self.state.read().await,
+            ConnectionState::Authenticated { .. }
+        )
     }
 
     /// Get authentication session
@@ -242,7 +245,7 @@ impl Connection {
     /// Authenticate the connection
     pub async fn authenticate(&self, session: auth::State) -> Result<()> {
         let session_id = format!("{}:{}", session.user(), session.worker());
-        
+
         {
             let mut state = self.state.write().await;
             *state = ConnectionState::Authenticated { session_id };
@@ -306,14 +309,16 @@ impl Connection {
     /// Initiate graceful disconnection
     pub async fn disconnect(&self, reason: DisconnectReason) {
         let mut state = self.state.write().await;
-        
+
         match &*state {
             ConnectionState::Disconnected { .. } => {
                 // Already disconnected
                 return;
             }
             _ => {
-                *state = ConnectionState::Terminating { reason: reason.clone() };
+                *state = ConnectionState::Terminating {
+                    reason: reason.clone(),
+                };
             }
         }
 
@@ -323,21 +328,23 @@ impl Connection {
     /// Mark connection as fully disconnected
     pub async fn mark_disconnected(&self, reason: DisconnectReason) {
         let mut state = self.state.write().await;
-        *state = ConnectionState::Disconnected { reason: reason.clone() };
-        
+        *state = ConnectionState::Disconnected {
+            reason: reason.clone(),
+        };
+
         tracing::debug!("Connection {} disconnected: {}", self.id, reason);
     }
 
     /// Check if connection should be terminated
     pub async fn should_terminate(&self, idle_timeout: Duration) -> Option<DisconnectReason> {
         let state = self.state.read().await;
-        
+
         match &*state {
             ConnectionState::Terminating { reason } => Some(reason.clone()),
             ConnectionState::Disconnected { reason } => Some(reason.clone()),
             _ => {
                 drop(state);
-                
+
                 if self.is_idle(idle_timeout).await {
                     Some(DisconnectReason::Timeout)
                 } else {

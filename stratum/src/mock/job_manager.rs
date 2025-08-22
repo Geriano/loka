@@ -23,7 +23,7 @@ pub struct MockJob {
 impl MockJob {
     pub fn new(clean_jobs: bool) -> Self {
         let mut rng = rand::thread_rng();
-        
+
         Self {
             job_id: Uuid::new_v4().to_string().replace("-", "")[..8].to_string(),
             prev_hash: generate_random_hex(64),
@@ -39,7 +39,7 @@ impl MockJob {
             created_at: Utc::now().timestamp(),
         }
     }
-    
+
     pub fn to_notify_params(&self) -> Vec<serde_json::Value> {
         vec![
             json!(self.job_id),
@@ -69,44 +69,44 @@ impl MockJobManager {
             max_history: 100,
         }
     }
-    
+
     pub async fn rotate_job(&self, clean_jobs: bool) -> Result<MockJob> {
         let new_job = MockJob::new(clean_jobs);
-        
+
         let mut current = self.current_job.write().await;
         let old_job = current.clone();
         *current = new_job.clone();
-        
+
         let mut history = self.job_history.write().await;
         history.push(old_job);
-        
+
         if history.len() > self.max_history {
             history.remove(0);
         }
-        
+
         Ok(new_job)
     }
-    
+
     pub async fn get_current_job(&self) -> MockJob {
         self.current_job.read().await.clone()
     }
-    
+
     pub async fn is_valid_job(&self, job_id: &str) -> bool {
         let current = self.current_job.read().await;
         if current.job_id == job_id {
             return true;
         }
-        
+
         let history = self.job_history.read().await;
         history.iter().any(|job| job.job_id == job_id)
     }
-    
+
     pub async fn is_stale_job(&self, job_id: &str) -> bool {
         let current = self.current_job.read().await;
         if current.job_id == job_id {
             return false;
         }
-        
+
         let history = self.job_history.read().await;
         history.iter().any(|job| job.job_id == job_id)
     }
@@ -115,7 +115,7 @@ impl MockJobManager {
 fn generate_random_hex(len: usize) -> String {
     use hex;
     use rand::RngCore;
-    
+
     let mut rng = rand::thread_rng();
     let mut bytes = vec![0u8; len / 2];
     rng.fill_bytes(&mut bytes);

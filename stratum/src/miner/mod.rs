@@ -5,11 +5,11 @@ pub mod config;
 #[cfg(feature = "mock-miner")]
 pub mod hashrate;
 #[cfg(feature = "mock-miner")]
-pub mod worker;
-#[cfg(feature = "mock-miner")]
 pub mod messages;
 #[cfg(feature = "mock-miner")]
 pub mod simulator;
+#[cfg(feature = "mock-miner")]
+pub mod worker;
 
 #[cfg(feature = "mock-miner")]
 pub use client::MockMiner;

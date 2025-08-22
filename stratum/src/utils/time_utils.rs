@@ -46,9 +46,7 @@ impl TimeUtils {
 
     /// Calculate time difference in seconds
     pub fn time_diff_seconds(start: SystemTime, end: SystemTime) -> f64 {
-        end.duration_since(start)
-            .unwrap_or_default()
-            .as_secs_f64()
+        end.duration_since(start).unwrap_or_default().as_secs_f64()
     }
 
     /// Check if timestamp is within time window
@@ -173,7 +171,7 @@ impl RateLimiter {
     /// Try to consume a token, returns true if allowed
     pub fn try_consume(&mut self) -> bool {
         self.refill_tokens();
-        
+
         if self.current_tokens >= 1.0 {
             self.current_tokens -= 1.0;
             true
@@ -185,7 +183,7 @@ impl RateLimiter {
     /// Try to consume multiple tokens
     pub fn try_consume_multiple(&mut self, tokens: u32) -> bool {
         self.refill_tokens();
-        
+
         if self.current_tokens >= tokens as f64 {
             self.current_tokens -= tokens as f64;
             true
@@ -198,7 +196,7 @@ impl RateLimiter {
     fn refill_tokens(&mut self) {
         let now = Instant::now();
         let elapsed = now.duration_since(self.last_refill).as_secs_f64();
-        
+
         let tokens_to_add = elapsed * self.refill_rate;
         self.current_tokens = (self.current_tokens + tokens_to_add).min(self.max_tokens as f64);
         self.last_refill = now;
@@ -234,7 +232,7 @@ impl TimeWindowAggregator {
     pub fn new(window_duration: Duration, bucket_count: usize) -> Self {
         let bucket_duration = window_duration / bucket_count as u32;
         let buckets = vec![TimeWindowBucket::default(); bucket_count];
-        
+
         Self {
             window_duration,
             buckets,
@@ -289,15 +287,16 @@ impl TimeWindowAggregator {
     fn rotate_buckets(&mut self) {
         let now = Instant::now();
         let elapsed = now.duration_since(self.last_rotation);
-        
+
         if elapsed >= self.bucket_duration {
-            let buckets_to_rotate = (elapsed.as_secs_f64() / self.bucket_duration.as_secs_f64()) as usize;
-            
+            let buckets_to_rotate =
+                (elapsed.as_secs_f64() / self.bucket_duration.as_secs_f64()) as usize;
+
             for _ in 0..buckets_to_rotate.min(self.buckets.len()) {
                 self.current_bucket = (self.current_bucket + 1) % self.buckets.len();
                 self.buckets[self.current_bucket].reset();
             }
-            
+
             self.last_rotation = now;
         }
     }
@@ -320,7 +319,7 @@ impl TimeWindowBucket {
             self.min = self.min.min(value);
             self.max = self.max.max(value);
         }
-        
+
         self.count += 1;
         self.sum += value;
     }
@@ -350,11 +349,7 @@ impl AsyncTimeout {
     }
 
     /// Run with timeout and default value on timeout
-    pub async fn with_timeout_or_default<F, T>(
-        future: F,
-        timeout: Duration,
-        default: T,
-    ) -> T
+    pub async fn with_timeout_or_default<F, T>(future: F, timeout: Duration, default: T) -> T
     where
         F: std::future::Future<Output = T>,
         T: Clone,
@@ -390,7 +385,7 @@ mod tests {
     fn test_unix_timestamp() {
         let timestamp = TimeUtils::unix_timestamp();
         assert!(timestamp > 0);
-        
+
         let millis = TimeUtils::unix_timestamp_millis();
         assert!(millis > timestamp * 1000);
     }
@@ -408,7 +403,7 @@ mod tests {
         timer.start();
         std::thread::sleep(Duration::from_millis(10));
         let elapsed = timer.record();
-        
+
         assert!(elapsed >= Duration::from_millis(10));
         assert_eq!(timer.measurements().len(), 1);
     }
@@ -416,23 +411,20 @@ mod tests {
     #[test]
     fn test_rate_limiter() {
         let mut limiter = RateLimiter::new(10.0, 5); // 10 ops/sec, burst of 5
-        
+
         // Should allow burst
         for _ in 0..5 {
             assert!(limiter.try_consume());
         }
-        
+
         // Should reject after burst
         assert!(!limiter.try_consume());
     }
 
     #[tokio::test]
     async fn test_async_timeout() {
-        let result = AsyncTimeout::with_timeout(
-            async { 42 },
-            Duration::from_millis(100),
-        ).await;
-        
+        let result = AsyncTimeout::with_timeout(async { 42 }, Duration::from_millis(100)).await;
+
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), 42);
     }
@@ -440,10 +432,10 @@ mod tests {
     #[test]
     fn test_time_window_aggregator() {
         let mut agg = TimeWindowAggregator::new(Duration::from_secs(60), 6);
-        
+
         agg.add_value(100);
         agg.increment();
-        
+
         assert_eq!(agg.total_count(), 2);
         assert_eq!(agg.total_sum(), 101); // 100 + 1
     }

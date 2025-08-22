@@ -12,7 +12,7 @@ use crate::protocol::parser::StratumParser;
 use crate::protocol::pipeline::MessageContext;
 use crate::protocol::traits::{
     MessageHandler, MessageParser, MessageRouter, ProtocolMetrics, ProtocolMetricsSnapshot,
-    SessionInfo, SessionHandle, SessionManager, SessionUpdate
+    SessionHandle, SessionInfo, SessionManager, SessionUpdate,
 };
 
 /// Default implementation of MessageParser using StratumParser
@@ -42,12 +42,11 @@ impl MessageParser for DefaultMessageParser {
     }
 
     async fn serialize(&self, message: &StratumMessage) -> Result<String> {
-        serde_json::to_string(message)
-            .map_err(|e| StratumError::Protocol {
-                message: format!("Failed to serialize message: {}", e),
-                method: None,
-                request_id: None,
-            })
+        serde_json::to_string(message).map_err(|e| StratumError::Protocol {
+            message: format!("Failed to serialize message: {}", e),
+            method: None,
+            request_id: None,
+        })
     }
 
     fn protocol_version(&self) -> &'static str {
@@ -76,11 +75,12 @@ impl MessageHandler for AuthenticationHandler {
     async fn handle(&self, context: MessageContext) -> Result<Option<StratumMessage>> {
         if let Some(StratumMessage::Authenticate { user, worker, .. }) = &context.parsed_message {
             info!("Handling authentication for {}:{}", user, worker);
-            
+
             // For now, accept all authentication requests
             // TODO: Add actual authentication logic
             Ok(Some(StratumMessage::Submitted {
-                id: context.parsed_message
+                id: context
+                    .parsed_message
                     .as_ref()
                     .and_then(|m| m.id())
                     .unwrap_or(0),
@@ -121,7 +121,7 @@ impl MessageHandler for SubmitHandler {
     async fn handle(&self, context: MessageContext) -> Result<Option<StratumMessage>> {
         if let Some(StratumMessage::Submit { id, job_id, .. }) = &context.parsed_message {
             debug!("Handling submit for job: {}", job_id);
-            
+
             // TODO: Add actual share validation logic
             // For now, accept all submissions
             Ok(Some(StratumMessage::Submitted {
@@ -153,14 +153,14 @@ impl DefaultMessageRouter {
         let router = Self {
             handlers: DashMap::new(),
         };
-        
+
         // Register default handlers
         let auth_handler = Arc::new(AuthenticationHandler::new());
         let submit_handler = Arc::new(SubmitHandler::new());
-        
+
         router.handlers.insert("auth".to_string(), auth_handler);
         router.handlers.insert("submit".to_string(), submit_handler);
-        
+
         router
     }
 }
@@ -176,14 +176,18 @@ impl MessageRouter for DefaultMessageRouter {
     async fn route(&self, context: MessageContext) -> Result<Option<StratumMessage>> {
         if let Some(ref message) = context.parsed_message {
             // Find a handler that supports this message
-            let handlers: Vec<_> = self.handlers.iter().map(|entry| entry.value().clone()).collect();
+            let handlers: Vec<_> = self
+                .handlers
+                .iter()
+                .map(|entry| entry.value().clone())
+                .collect();
             for handler in handlers {
                 if handler.supports(message) {
                     return handler.handle(context.clone()).await;
                 }
             }
         }
-        
+
         warn!("No handler found for message: {:?}", context.parsed_message);
         Ok(None)
     }
@@ -236,21 +240,28 @@ impl Default for InMemorySessionManager {
 
 #[async_trait]
 impl SessionManager for InMemorySessionManager {
-    async fn start_session(&self, client_id: String, mut session_info: SessionInfo) -> Result<SessionHandle> {
+    async fn start_session(
+        &self,
+        client_id: String,
+        mut session_info: SessionInfo,
+    ) -> Result<SessionHandle> {
         let session_id = self.generate_session_id();
         session_info.session_id = session_id.clone();
         session_info.client_id = client_id.clone();
-        
+
         let handle = SessionHandle::new(session_id.clone(), client_id);
         self.sessions.insert(session_id, session_info);
-        
+
         info!("Started session: {}", handle.session_id);
         Ok(handle)
     }
 
     async fn end_session(&self, session_id: &str) -> Result<()> {
         if let Some((_, session)) = self.sessions.remove(session_id) {
-            info!("Ended session: {} for client: {}", session_id, session.client_id);
+            info!(
+                "Ended session: {} for client: {}",
+                session_id, session.client_id
+            );
             Ok(())
         } else {
             Err(StratumError::Protocol {
@@ -314,6 +325,7 @@ pub struct DefaultProtocolMetrics {
     error_count: AtomicU64,
     total_processing_time: AtomicU64, // in microseconds
     session_count: AtomicU64,
+    #[allow(unused)]
     start_time: Instant,
 }
 
@@ -341,7 +353,9 @@ impl ProtocolMetrics for DefaultProtocolMetrics {
         // Update message type count
         self.message_counts
             .entry(message_type.to_string())
-            .and_modify(|counter| { counter.fetch_add(1, Ordering::Relaxed); })
+            .and_modify(|counter| {
+                counter.fetch_add(1, Ordering::Relaxed);
+            })
             .or_insert_with(|| AtomicU64::new(1));
 
         // Update success/error counts
@@ -353,12 +367,13 @@ impl ProtocolMetrics for DefaultProtocolMetrics {
 
         // Update processing time
         let processing_micros = processing_time.as_micros() as u64;
-        self.total_processing_time.fetch_add(processing_micros, Ordering::Relaxed);
+        self.total_processing_time
+            .fetch_add(processing_micros, Ordering::Relaxed);
     }
 
     fn record_session_event(&self, event_type: &str, _session_id: &str) {
         debug!("Session event: {}", event_type);
-        
+
         if event_type == "session_start" {
             self.session_count.fetch_add(1, Ordering::Relaxed);
         }
@@ -370,8 +385,8 @@ impl ProtocolMetrics for DefaultProtocolMetrics {
     }
 
     fn get_metrics(&self) -> ProtocolMetricsSnapshot {
-        let total_messages = self.success_count.load(Ordering::Relaxed) + 
-                            self.error_count.load(Ordering::Relaxed);
+        let total_messages =
+            self.success_count.load(Ordering::Relaxed) + self.error_count.load(Ordering::Relaxed);
         let successful_messages = self.success_count.load(Ordering::Relaxed);
         let failed_messages = self.error_count.load(Ordering::Relaxed);
 
