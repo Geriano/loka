@@ -2,8 +2,8 @@ global:
   scrape_interval: 30s
   evaluation_interval: 30s
   external_labels:
-    cluster: 'loka-stratum'
-    environment: 'production'
+    cluster: "loka-stratum"
+    environment: "production"
 
 rule_files:
   - "rules/*.yml"
@@ -12,26 +12,26 @@ alerting:
   alertmanagers:
     - static_configs:
         - targets:
-          - alertmanager:9093
+            - alertmanager:9093
 
 scrape_configs:
   # Prometheus itself
-  - job_name: 'prometheus'
+  - job_name: "prometheus"
     static_configs:
-      - targets: ['localhost:9090']
+      - targets: ["localhost:9090"]
     scrape_interval: 30s
     metrics_path: /metrics
 
   # Loka Stratum mining proxy
-  - job_name: 'loka-stratum'
+  - job_name: "loka-stratum"
     static_configs:
-      - targets: ['loka-stratum:9090']
+      - targets: ["host.docker.internal:9091"]
     scrape_interval: 30s
     metrics_path: /metrics/prometheus
     scrape_timeout: 15s
     honor_labels: true
     params:
-      format: ['prometheus']
+      format: ["prometheus"]
 
   # Loka Stratum health check (disabled - endpoint returns JSON, not Prometheus format)
   # - job_name: 'loka-stratum-health'
@@ -42,32 +42,32 @@ scrape_configs:
   #   scrape_timeout: 5s
 
   # Node Exporter (system metrics)
-  - job_name: 'node-exporter'
+  - job_name: "node-exporter"
     static_configs:
-      - targets: ['node-exporter:9100']
+      - targets: ["node-exporter:9100"]
     scrape_interval: 30s
     scrape_timeout: 15s
     metrics_path: /metrics
 
   # cAdvisor (container metrics)
-  - job_name: 'cadvisor'
+  - job_name: "cadvisor"
     static_configs:
-      - targets: ['cadvisor:8080']
+      - targets: ["cadvisor:8080"]
     scrape_interval: 30s
     scrape_timeout: 15s
     metrics_path: /metrics
 
   # AlertManager
-  - job_name: 'alertmanager'
+  - job_name: "alertmanager"
     static_configs:
-      - targets: ['alertmanager:9093']
+      - targets: ["alertmanager:9093"]
     scrape_interval: 30s
     metrics_path: /metrics
 
   # Grafana
-  - job_name: 'grafana'
+  - job_name: "grafana"
     static_configs:
-      - targets: ['grafana:3000']
+      - targets: ["grafana:3000"]
     scrape_interval: 30s
     metrics_path: /metrics
 
@@ -77,7 +77,6 @@ scrape_configs:
   #   docker_sd_configs:
   #     - host: unix:///var/run/docker.sock
   #       refresh_interval: 30s
-
 # Storage is configured via command line arguments
 
 # Remote write configuration (optional - for long-term storage)
