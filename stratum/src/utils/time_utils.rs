@@ -379,7 +379,6 @@ pub struct TimerStats {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tokio::time::sleep;
 
     #[test]
     fn test_unix_timestamp() {

@@ -386,7 +386,6 @@ macro_rules! spawn_task_with_description {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::Duration;
 
     #[tokio::test]
     async fn test_task_manager_basic() {

@@ -65,15 +65,11 @@ impl MockConfig {
     }
 
     pub fn should_accept_share(&self) -> bool {
-        use rand::Rng;
-        let mut rng = rand::thread_rng();
-        rng.gen_bool(self.accept_rate)
+        rand::random()
     }
 
     pub fn should_inject_error(&self) -> bool {
-        use rand::Rng;
-        let mut rng = rand::thread_rng();
-        rng.gen_bool(self.error_rate)
+        rand::random()
     }
 }
 

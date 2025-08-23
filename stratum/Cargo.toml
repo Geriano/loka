@@ -39,15 +39,24 @@ utoipa-axum = { workspace = true }
 utoipa-swagger-ui = { workspace = true }
 regex = { workspace = true }
 sysinfo = { workspace = true }
+sea-orm = { workspace = true }
 rand = { workspace = true, optional = true }
 hex = { workspace = true, optional = true }
 
 [dependencies.loka-metrics]
 workspace = true
 
+# Database dependencies
+[dependencies.loka-model]
+path = "../model"
+
+[dependencies.migration]
+path = "../migration"
+
 [dev-dependencies]
 criterion = { workspace = true }
 tokio-test = "0.4"
+rand = { workspace = true }
 
 [[bench]]
 name = "critical_path"

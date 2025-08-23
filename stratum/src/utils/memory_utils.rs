@@ -467,7 +467,7 @@ mod tests {
     fn test_arena() {
         let mut arena = Arena::with_chunk_size(1024);
 
-        let ptr1 = arena.alloc(64, 1).unwrap();
+        let _ptr1 = arena.alloc(64, 1).unwrap();
         let used_after_first = arena.used_memory();
         assert!(used_after_first >= 64);
 

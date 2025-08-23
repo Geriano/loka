@@ -124,6 +124,14 @@ pub enum StratumError {
     #[error("Data corruption detected: {message}")]
     DataCorruption { message: String },
 
+    // Database-related errors
+    #[error("Database error: {message}")]
+    Database {
+        message: String,
+        #[source]
+        source: Option<Box<dyn std::error::Error + Send + Sync>>,
+    },
+
     // Rate limiting and security errors
     #[error("Rate limit exceeded: {limit} requests per {window:?}")]
     RateLimitExceeded {
@@ -285,6 +293,7 @@ impl StratumError {
             StratumError::Network { .. }
                 | StratumError::ConnectionTimeout { .. }
                 | StratumError::Storage { .. }
+                | StratumError::Database { .. }
                 | StratumError::TaskTimeout { .. }
                 | StratumError::ResourceUnavailable { .. }
         )

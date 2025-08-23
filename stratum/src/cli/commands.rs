@@ -1,6 +1,8 @@
 use anyhow::Result;
 use axum::{Router, http::StatusCode, response::Json, routing::get};
 use serde::{Deserialize, Serialize};
+use std::net::Ipv4Addr;
+use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::signal;
@@ -8,7 +10,10 @@ use tracing::{error, info, warn};
 
 use crate::cli::Args;
 use crate::config::Config;
-use crate::services::metrics::{MetricsService, MetricsSnapshot, UserMetricsSnapshot};
+use crate::services::{
+    database::DatabaseService,
+    metrics::{MetricsService, MetricsSnapshot, UserMetricsSnapshot},
+};
 
 // Global metrics service for HTTP endpoints
 static STRATUM_METRICS: std::sync::OnceLock<Arc<MetricsService>> = std::sync::OnceLock::new();
@@ -19,15 +24,14 @@ pub async fn execute(args: Args) -> Result<()> {
     match args.command {
         crate::cli::Commands::Start {
             bind,
-            pool,
+            database_url: database,
             max_connections,
             idle_timeout,
             daemon,
         } => {
             start_server(
-                args.config,
                 bind,
-                pool,
+                database,
                 max_connections,
                 idle_timeout,
                 daemon,
@@ -42,13 +46,15 @@ pub async fn execute(args: Args) -> Result<()> {
             watch,
         } => show_status(endpoint, format, watch).await,
         crate::cli::Commands::Config { file, show } => validate_config(file, show).await,
-        crate::cli::Commands::Init { output, force } => generate_config(output, force).await,
         crate::cli::Commands::Bench {
             target,
             connections,
             duration,
             format,
         } => run_benchmark(target, connections, duration, format).await,
+        crate::cli::Commands::Database { command, url } => {
+            handle_database_command(command, url).await
+        }
         #[cfg(feature = "mock-pool")]
         crate::cli::Commands::MockPool {
             bind,
@@ -107,42 +113,27 @@ pub async fn execute(args: Args) -> Result<()> {
 }
 
 async fn start_server(
-    config_path: Option<std::path::PathBuf>,
-    bind: String,
-    pool: Option<String>,
-    max_connections: Option<usize>,
-    idle_timeout: Option<u64>,
+    bind: u16,
+    database: String,
+    max_connections: usize,
+    idle_timeout: u64,
     daemon: bool,
     enable_metrics: bool,
     metrics_addr: String,
 ) -> Result<()> {
     info!("Starting Loka Stratum server");
 
-    // Load configuration
-    let mut config = if let Some(path) = config_path {
-        Config::load_from_file(path)?
-    } else {
-        Config::default()
-    };
+    // Initialize database service first (needed for pool configuration)
+    let database_service = DatabaseService::new(&database)
+        .await
+        .expect("Failed to initialize database service");
 
-    // Override config with CLI arguments (only if provided)
-    config.server.bind_address = bind.parse()?;
-    if let Some(pool_addr) = pool {
-        config.pool.address = pool_addr;
-    }
-    if let Some(max_conns) = max_connections {
-        config.server.max_connections = max_conns;
-    }
-    if let Some(timeout) = idle_timeout {
-        config.server.idle_timeout = Duration::from_secs(timeout);
-    }
+    // Load configuration with database-driven pool config if available
+    let mut config = Config::load(&database_service).await?;
 
-    // Validate that we have a pool address (either from config or CLI)
-    if config.pool.address.is_empty() {
-        return Err(anyhow::anyhow!(
-            "Pool address is required. Either provide it in the config file or use --pool argument."
-        ));
-    }
+    config.server.bind_address = SocketAddr::from((Ipv4Addr::UNSPECIFIED, bind));
+    config.server.max_connections = max_connections;
+    config.server.idle_timeout = Duration::from_secs(idle_timeout);
 
     // Validate configuration using the validation module method
     config.validate()?;
@@ -171,8 +162,7 @@ async fn start_server(
     }
 
     // Create and start the actual server
-    let config_arc = Arc::new(config);
-    let listener = crate::Listener::new(config_arc).await?;
+    let listener = crate::Listener::new(config).await?;
 
     // Start server in background task
     let server_handle = tokio::spawn(async move {
@@ -287,24 +277,6 @@ async fn validate_config(file: std::path::PathBuf, show: bool) -> Result<()> {
         println!("Effective configuration:");
         println!("{:#?}", config);
     }
-
-    Ok(())
-}
-
-async fn generate_config(output: std::path::PathBuf, force: bool) -> Result<()> {
-    if output.exists() && !force {
-        return Err(anyhow::anyhow!(
-            "File {} already exists. Use --force to overwrite.",
-            output.display()
-        ));
-    }
-
-    let config = Config::default();
-    let toml_content = toml::to_string_pretty(&config)?;
-
-    tokio::fs::write(&output, toml_content).await?;
-
-    info!("✅ Generated configuration file: {}", output.display());
 
     Ok(())
 }
@@ -776,6 +748,73 @@ async fn start_mock_miner(
     // Start the simulation
     let simulator = MinerSimulator::new(config);
     simulator.run().await?;
+
+    Ok(())
+}
+
+/// Handle database management commands
+async fn handle_database_command(command: crate::cli::DatabaseCommands, url: String) -> Result<()> {
+    use crate::cli::DatabaseCommands;
+    use crate::services::database::DatabaseService;
+    use migration::{Migrator, MigratorTrait};
+
+    // Load configuration to get database URL
+    info!("Connecting to database...");
+    let database_service = DatabaseService::new(&url).await?;
+
+    match command {
+        DatabaseCommands::Migrate { up, down } => match (up, down) {
+            (true, None) => {
+                info!("Running up migrations...");
+                Migrator::up(&database_service.connection, None).await?;
+                info!("All migrations completed successfully");
+            }
+            (false, Some(steps)) => {
+                info!("Running down migrations ({} steps)...", steps);
+                Migrator::down(&database_service.connection, Some(steps)).await?;
+                info!("Down migrations completed successfully");
+            }
+            (false, None) => {
+                info!("Running all pending up migrations...");
+                Migrator::up(&database_service.connection, None).await?;
+                info!("All migrations completed successfully");
+            }
+            (true, Some(_)) => {
+                error!("Cannot specify both --up and --down");
+                return Ok(());
+            }
+        },
+        DatabaseCommands::Status => {
+            info!("Checking database connection: {}", url);
+
+            match database_service.health_check().await {
+                Ok(_) => {
+                    info!("✅ Database connection successful");
+                    info!("Database URL: {}", url);
+                }
+                Err(e) => {
+                    error!("❌ Database connection failed: {}", e);
+                }
+            }
+        }
+        DatabaseCommands::Reset { confirm } => {
+            if !confirm {
+                error!("Database reset requires --confirm flag");
+                warn!("This will drop ALL tables and data!");
+                return Ok(());
+            }
+
+            info!("🚨 RESETTING DATABASE: {}", url);
+
+            info!("Dropping all tables...");
+            Migrator::down(&database_service.connection, None).await?;
+
+            info!("Running fresh migrations...");
+            Migrator::up(&database_service.connection, None).await?;
+
+            info!("✅ Database reset completed successfully");
+        }
+    }
 
     Ok(())
 }

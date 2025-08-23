@@ -19,6 +19,7 @@ use super::validator::{MockShareValidator, ShareSubmission};
 
 #[derive(Clone)]
 struct ClientSession {
+    #[allow(unused)]
     id: String,
     worker: Option<String>,
     extranonce1: String,
@@ -343,11 +344,6 @@ impl MockPoolHandle {
 }
 
 fn generate_extranonce1() -> String {
-    use hex;
-    use rand::RngCore;
-
-    let mut rng = rand::thread_rng();
-    let mut bytes = [0u8; 4];
-    rng.fill_bytes(&mut bytes);
+    let bytes: [u8; 4] = rand::random();
     hex::encode(bytes)
 }

@@ -10,10 +10,6 @@ use std::path::PathBuf;
                  featuring lock-free optimizations, comprehensive metrics, and advanced monitoring."
 )]
 pub struct Args {
-    /// Configuration file path
-    #[arg(short, long, value_name = "FILE")]
-    pub config: Option<PathBuf>,
-
     /// Enable verbose logging
     #[arg(short, long, action = clap::ArgAction::Count)]
     pub verbose: u8,
@@ -39,24 +35,48 @@ pub struct Args {
 }
 
 #[derive(Subcommand, Debug)]
+pub enum DatabaseCommands {
+    /// Run database migrations
+    Migrate {
+        /// Run up migrations
+        #[arg(long)]
+        up: bool,
+
+        /// Run down migrations (specify number of migrations to rollback)
+        #[arg(long)]
+        down: Option<u32>,
+    },
+
+    /// Check database connection and status
+    Status,
+
+    /// Reset database (drop all tables and run fresh migrations)
+    Reset {
+        /// Confirm the reset operation
+        #[arg(long)]
+        confirm: bool,
+    },
+}
+
+#[derive(Subcommand, Debug)]
 pub enum Commands {
     /// Start the Stratum proxy server
     Start {
         /// Server bind address (overrides config file)
-        #[arg(short, long, default_value = "0.0.0.0:3333")]
-        bind: String,
+        #[arg(short, long, default_value = "3333")]
+        bind: u16,
 
-        /// Upstream pool address (overrides config file if provided)
-        #[arg(short, long)]
-        pool: Option<String>,
+        /// Database connection string
+        #[arg(long = "db", env = "DATABASE_URL")]
+        database_url: String,
 
         /// Maximum concurrent connections (overrides config file if provided)
-        #[arg(long)]
-        max_connections: Option<usize>,
+        #[arg(long, default_value = "1000")]
+        max_connections: usize,
 
         /// Connection idle timeout in seconds (overrides config file if provided)
-        #[arg(long)]
-        idle_timeout: Option<u64>,
+        #[arg(long, default_value = "60")]
+        idle_timeout: u64,
 
         /// Run in daemon mode
         #[arg(short, long)]
@@ -89,15 +109,14 @@ pub enum Commands {
         show: bool,
     },
 
-    /// Generate example configuration file
-    Init {
-        /// Output file path
-        #[arg(short, long, default_value = "loka-stratum.toml")]
-        output: PathBuf,
+    /// Database management commands
+    Database {
+        /// Database url connection string
+        #[arg(short, long, env = "DATABASE_URL")]
+        url: String,
 
-        /// Overwrite existing file
-        #[arg(long)]
-        force: bool,
+        #[command(subcommand)]
+        command: DatabaseCommands,
     },
 
     /// Performance benchmarking and testing

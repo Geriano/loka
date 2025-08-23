@@ -1,12 +1,15 @@
+use sea_orm::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::net::{Ipv4Addr, SocketAddr};
+use std::net::SocketAddr;
 use std::time::Duration;
+use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
     pub server: ServerConfig,
     pub pool: PoolConfig,
     pub limiter: LimiterConfig,
+    pub database: DatabaseConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -21,14 +24,12 @@ pub struct ServerConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PoolConfig {
+    /// Pool unique identifier (UUID)
+    pub id: Uuid,
     /// Pool address (host:port format)
     pub address: String,
     /// Pool name
     pub name: String,
-    /// Pool host (deprecated, use address instead)
-    pub host: Option<Ipv4Addr>,
-    /// Pool port (deprecated, use address instead)
-    pub port: Option<u16>,
     /// Pool username
     pub username: String,
     /// Pool password
@@ -48,6 +49,12 @@ pub struct LimiterConfig {
     /// Submissions expiration time (default 2 days)
     /// It will be used for cleanup auth when last activity is older than this duration
     pub submissions: Duration,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DatabaseConfig {
+    /// Database connection URL (PostgreSQL format)
+    pub url: String,
 }
 
 impl Default for ServerConfig {
@@ -70,26 +77,42 @@ impl Default for LimiterConfig {
     }
 }
 
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            server: ServerConfig::default(),
-            pool: PoolConfig {
-                address: "127.0.0.1:4444".to_string(),
-                name: "default".to_string(),
-                host: None,
-                port: None,
-                username: "default_user".to_string(),
-                password: None,
-                separator: (".".to_string(), "_".to_string()),
-                extranonce: false,
-            },
-            limiter: LimiterConfig::default(),
+impl Config {
+    pub async fn load(
+        database_service: &crate::services::database::DatabaseService,
+    ) -> crate::Result<Self> {
+        let pool = loka_model::entities::pools::Entity::find()
+            .filter(loka_model::entities::pools::Column::Active.eq(true))
+            .one(&database_service.connection)
+            .await;
+
+        match pool {
+            Ok(Some(pool)) => Ok(Self {
+                server: ServerConfig::default(),
+                pool: PoolConfig {
+                    id: pool.id,
+                    address: format!("{}:{}", pool.host, pool.port),
+                    name: pool.name,
+                    username: pool.username,
+                    password: pool.password,
+                    separator: (pool.sep1, pool.sep2),
+                    // TODO: Add extranonce support
+                    extranonce: false,
+                },
+                limiter: LimiterConfig::default(),
+                database: DatabaseConfig {
+                    url: database_service.url().to_string(),
+                },
+            }),
+            Err(DbErr::RecordNotFound(_)) | Ok(None) => Err(crate::error::StratumError::Internal {
+                message: "No active pool configuration found in database".to_string(),
+            }),
+            Err(e) => Err(crate::error::StratumError::Internal {
+                message: format!("Failed to load pool configuration from database: {}", e),
+            }),
         }
     }
-}
 
-impl Config {
     /// Load configuration from file
     pub fn load_from_file<P: AsRef<std::path::Path>>(path: P) -> crate::Result<Self> {
         let content =
@@ -101,5 +124,12 @@ impl Config {
                 message: format!("Failed to parse config: {}", e),
             })?;
         Ok(config)
+    }
+
+    /// Get list of all available pools from database
+    pub async fn list_available_pools(
+        database_service: &crate::services::database::DatabaseService,
+    ) -> crate::Result<Vec<PoolConfig>> {
+        database_service.list_active_pool_configs().await
     }
 }

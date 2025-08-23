@@ -1,6 +1,5 @@
 use anyhow::Result;
 use chrono::Utc;
-use rand::Rng;
 use serde_json::json;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -22,14 +21,12 @@ pub struct MockJob {
 
 impl MockJob {
     pub fn new(clean_jobs: bool) -> Self {
-        let mut rng = rand::thread_rng();
-
         Self {
             job_id: Uuid::new_v4().to_string().replace("-", "")[..8].to_string(),
             prev_hash: generate_random_hex(64),
             coinbase1: generate_random_hex(80),
             coinbase2: generate_random_hex(80),
-            merkle_branches: (0..rng.gen_range(5..15))
+            merkle_branches: (0..rand::random_range(5..15))
                 .map(|_| generate_random_hex(64))
                 .collect(),
             version: "20000000".to_string(),
@@ -113,11 +110,8 @@ impl MockJobManager {
 }
 
 fn generate_random_hex(len: usize) -> String {
-    use hex;
     use rand::RngCore;
-
-    let mut rng = rand::thread_rng();
-    let mut bytes = vec![0u8; len / 2];
-    rng.fill_bytes(&mut bytes);
+    let mut bytes: Vec<u8> = Vec::with_capacity(len / 2);
+    rand::rng().fill_bytes(&mut bytes);
     hex::encode(bytes)
 }

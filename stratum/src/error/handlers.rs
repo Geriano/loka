@@ -592,7 +592,6 @@ impl ErrorRecovery {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::net::SocketAddr;
 
     #[tokio::test]
     async fn test_default_error_handler() {

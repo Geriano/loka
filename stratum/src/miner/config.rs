@@ -125,15 +125,11 @@ impl MinerConfig {
     }
 
     pub fn should_submit_stale(&self) -> bool {
-        use rand::Rng;
-        let mut rng = rand::thread_rng();
-        rng.gen_bool(self.stale_rate)
+        rand::random()
     }
 
     pub fn should_submit_invalid(&self) -> bool {
-        use rand::Rng;
-        let mut rng = rand::thread_rng();
-        rng.gen_bool(self.invalid_rate)
+        rand::random()
     }
 }
 

@@ -215,7 +215,6 @@ impl AuthenticationMiddleware {
     }
 
     /// Transform miner username to pool-compatible format
-    /// Converts "john.test" to "37vuX2XMqtcrobGwxSZJSwJoYyjiH18SiQ.john_test"
     fn transform_username(&self, user: &str, worker: &str) -> String {
         let (from_separator, to_separator) = &self.pool_config.separator;
 
@@ -227,22 +226,6 @@ impl AuthenticationMiddleware {
 
         // Combine pool username with transformed miner username
         format!("{}.{}", self.pool_config.username, transformed_worker)
-    }
-}
-
-impl Default for AuthenticationMiddleware {
-    fn default() -> Self {
-        // Use default pool config when no config is provided
-        Self::new(PoolConfig {
-            address: "127.0.0.1:4444".to_string(),
-            name: "default".to_string(),
-            host: None,
-            port: None,
-            username: "default_user".to_string(),
-            password: None,
-            separator: (".".to_string(), "_".to_string()),
-            extranonce: false,
-        })
     }
 }
 

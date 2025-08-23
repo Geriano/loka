@@ -1,6 +1,5 @@
 // Protocol layer - Stratum V1 implementation
 
-pub mod examples;
 pub mod handler;
 pub mod implementations;
 pub mod messages;

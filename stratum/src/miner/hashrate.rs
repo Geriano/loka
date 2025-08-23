@@ -1,4 +1,3 @@
-use rand::Rng;
 use std::time::{Duration, Instant};
 
 #[derive(Debug, Clone)]
@@ -29,8 +28,7 @@ impl HashrateSimulator {
         let expected_seconds = difficulty / hashrate_hs;
 
         // Add variance to make it more realistic
-        let mut rng = rand::thread_rng();
-        let variance = rng.gen_range(-self.variance_factor..=self.variance_factor);
+        let variance = rand::random::<f64>().clamp(-self.variance_factor, self.variance_factor);
         let actual_seconds = expected_seconds * (1.0 + variance);
 
         // Ensure minimum interval to avoid spam
@@ -78,25 +76,19 @@ impl HashrateSimulator {
     }
 
     pub fn generate_realistic_nonce(&self) -> String {
-        use rand::RngCore;
-        let mut rng = rand::thread_rng();
-        let nonce = rng.next_u32();
+        let nonce = rand::random::<u32>();
         format!("{:08x}", nonce)
     }
 
-    pub fn generate_extranonce2(&self, size: usize) -> String {
-        use rand::RngCore;
-        let mut rng = rand::thread_rng();
-        let mut bytes = vec![0u8; size];
-        rng.fill_bytes(&mut bytes);
+    pub fn generate_extranonce2(&self, _size: usize) -> String {
+        let bytes: [u8; 32] = rand::random();
         hex::encode(bytes)
     }
 
     pub fn should_be_valid_share(&self, difficulty: f64) -> bool {
         // Simulate finding a valid share based on hashrate and difficulty
         // This is a simplified model - real mining involves more complex probability
-        let mut rng = rand::thread_rng();
-        let random_value: f64 = rng.r#gen();
+        let random_value: f64 = rand::random();
 
         // Calculate probability of finding a valid share
         // Higher hashrate and lower difficulty = higher probability

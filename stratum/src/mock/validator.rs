@@ -1,5 +1,4 @@
 use anyhow::{Result, anyhow};
-use rand::Rng;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -16,6 +15,7 @@ pub struct ShareSubmission {
 pub struct MockShareValidator {
     submitted_shares: Arc<RwLock<HashSet<String>>>,
     share_stats: Arc<RwLock<HashMap<String, ShareStats>>>,
+    #[allow(unused)]
     accept_rate: f64,
 }
 
@@ -64,8 +64,7 @@ impl MockShareValidator {
             return Err(anyhow!("Invalid share format"));
         }
 
-        let mut rng = rand::thread_rng();
-        let should_accept = rng.gen_bool(self.accept_rate);
+        let should_accept = rand::random();
 
         if should_accept {
             submitted.insert(share_id);

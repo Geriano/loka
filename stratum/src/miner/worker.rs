@@ -51,6 +51,7 @@ impl WorkerStats {
 }
 
 pub struct MockWorker {
+    #[allow(unused)]
     worker_id: usize,
     worker_name: String,
     config: Arc<MinerConfig>,

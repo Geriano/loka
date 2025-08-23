@@ -325,6 +325,8 @@ pub struct DefaultProtocolMetrics {
     error_count: AtomicU64,
     total_processing_time: AtomicU64, // in microseconds
     session_count: AtomicU64,
+    connect_validation_counts: DashMap<String, AtomicU64>,
+    connect_validation_time: AtomicU64, // in microseconds
     #[allow(unused)]
     start_time: Instant,
 }
@@ -337,8 +339,50 @@ impl DefaultProtocolMetrics {
             error_count: AtomicU64::new(0),
             total_processing_time: AtomicU64::new(0),
             session_count: AtomicU64::new(0),
+            connect_validation_counts: DashMap::new(),
+            connect_validation_time: AtomicU64::new(0),
             start_time: Instant::now(),
         }
+    }
+
+    /// Record HTTP CONNECT validation metrics
+    pub fn record_connect_validation(&self, result_type: &str, duration: Duration) {
+        // Update validation result count
+        self.connect_validation_counts
+            .entry(result_type.to_string())
+            .and_modify(|counter| {
+                counter.fetch_add(1, Ordering::Relaxed);
+            })
+            .or_insert_with(|| AtomicU64::new(1));
+
+        // Update total validation time
+        let validation_micros = duration.as_micros() as u64;
+        self.connect_validation_time
+            .fetch_add(validation_micros, Ordering::Relaxed);
+            
+        tracing::debug!(
+            "CONNECT validation: {} took {:?}",
+            result_type,
+            duration
+        );
+    }
+
+    /// Get CONNECT validation statistics
+    pub fn get_connect_validation_stats(&self) -> (std::collections::HashMap<String, u64>, Duration) {
+        let mut stats = std::collections::HashMap::new();
+        for entry in self.connect_validation_counts.iter() {
+            stats.insert(entry.key().clone(), entry.value().load(Ordering::Relaxed));
+        }
+        
+        let total_validations: u64 = stats.values().sum();
+        let total_time_micros = self.connect_validation_time.load(Ordering::Relaxed);
+        let avg_validation_time = if total_validations > 0 {
+            Duration::from_micros(total_time_micros / total_validations)
+        } else {
+            Duration::from_micros(0)
+        };
+        
+        (stats, avg_validation_time)
     }
 }
 

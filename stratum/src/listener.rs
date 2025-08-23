@@ -4,6 +4,7 @@ use tokio::net::{TcpListener, TcpStream};
 use tracing;
 
 use crate::handler::Handler;
+use crate::services::database::DatabaseService;
 use crate::{Config, Manager};
 
 pub struct Listener {
@@ -13,7 +14,8 @@ pub struct Listener {
 }
 
 impl Listener {
-    pub async fn new(config: Arc<Config>) -> anyhow::Result<Self> {
+    pub async fn new(config: Config) -> anyhow::Result<Self> {
+        let config = Arc::new(config);
         let listener = TcpListener::bind(config.server.bind_address).await?;
 
         tracing::info!(
@@ -22,7 +24,21 @@ impl Listener {
             config.pool.address
         );
 
-        let manager = Arc::new(Manager::new(config.clone()));
+        // Initialize database service (always required)
+        tracing::info!(
+            "Initializing database connection to {}",
+            config.database.url
+        );
+        let database = DatabaseService::new(&config.database.url)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to initialize database: {}", e))?;
+        tracing::info!("Database connected successfully");
+        let database = Arc::new(database);
+
+        let manager = Arc::new(
+            Manager::new(config.clone(), database)
+                .map_err(|e| anyhow::anyhow!("Failed to initialize manager: {}", e))?,
+        );
 
         // Create handler factory with protocol handler
         let handler_factory = Handler::new(manager.clone(), config.clone());

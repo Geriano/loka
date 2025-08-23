@@ -20,13 +20,6 @@ impl Config {
             .into());
         }
 
-        // Validate legacy pool configuration if present
-        if let Some(port) = self.pool.port {
-            if port == 0 {
-                return Err(ConfigError::InvalidPort { port }.into());
-            }
-        }
-
         if self.pool.name.trim().is_empty() {
             return Err(ConfigError::MissingField {
                 field: "pool.name".to_string(),
@@ -74,13 +67,5 @@ impl Config {
         }
 
         Ok(())
-    }
-
-    pub fn load_from_env() -> Result<Self> {
-        // For now, return default config
-        // TODO: Implement environment variable loading
-        let config = Self::default();
-        config.validate()?;
-        Ok(config)
     }
 }

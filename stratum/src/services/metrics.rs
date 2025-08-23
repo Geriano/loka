@@ -7,6 +7,8 @@ use tokio::sync::RwLock;
 use tokio::time::interval;
 use tracing::debug;
 
+use crate::services::database::DatabaseService;
+
 /// High-performance atomic metrics collector
 #[derive(Debug)]
 pub struct AtomicMetrics {
@@ -476,13 +478,54 @@ impl UserMetricsSnapshot {
     }
 }
 
-/// High-performance metrics service
+/// Database-backed metrics for persistent data
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DatabaseMetrics {
+    pub total_miners: u64,
+    pub active_miners_24h: u64,
+    pub total_workers: u64,
+    pub active_workers_24h: u64,
+    pub total_submissions_15m: u64,
+    pub valid_submissions_15m: u64,
+    pub invalid_submissions_15m: u64,
+    pub total_submissions_24h: u64,
+    pub valid_submissions_24h: u64,
+    pub invalid_submissions_24h: u64,
+    pub acceptance_rate_15m: f64,
+    pub acceptance_rate_24h: f64,
+    pub estimated_hashrate_15m: f64,
+    pub estimated_hashrate_24h: f64,
+}
+
+impl Default for DatabaseMetrics {
+    fn default() -> Self {
+        Self {
+            total_miners: 0,
+            active_miners_24h: 0,
+            total_workers: 0,
+            active_workers_24h: 0,
+            total_submissions_15m: 0,
+            valid_submissions_15m: 0,
+            invalid_submissions_15m: 0,
+            total_submissions_24h: 0,
+            valid_submissions_24h: 0,
+            invalid_submissions_24h: 0,
+            acceptance_rate_15m: 0.0,
+            acceptance_rate_24h: 0.0,
+            estimated_hashrate_15m: 0.0,
+            estimated_hashrate_24h: 0.0,
+        }
+    }
+}
+
+/// High-performance metrics service with database backing
 #[derive(Debug)]
 pub struct MetricsService {
     pub global_metrics: Arc<AtomicMetrics>,
     pub time_series: Arc<TimeSeriesMetrics>,
     pub user_metrics: Arc<DashMap<String, Arc<UserMetrics>>>,
     pub config: MetricsConfig,
+    pub database: Option<Arc<DatabaseService>>,
 }
 
 #[derive(Debug, Clone)]
@@ -513,6 +556,17 @@ impl MetricsService {
             time_series: Arc::new(TimeSeriesMetrics::new(config.max_snapshots)),
             user_metrics: Arc::new(DashMap::new()),
             config,
+            database: None,
+        }
+    }
+
+    pub fn with_database(config: MetricsConfig, database: Arc<DatabaseService>) -> Self {
+        Self {
+            global_metrics: Arc::new(AtomicMetrics::new()),
+            time_series: Arc::new(TimeSeriesMetrics::new(config.max_snapshots)),
+            user_metrics: Arc::new(DashMap::new()),
+            config,
+            database: Some(database),
         }
     }
 
@@ -751,7 +805,172 @@ impl MetricsService {
             .fetch_add(1, Ordering::Relaxed);
     }
 
-    /// Get metrics summary as human-readable string
+    /// Get database-backed metrics
+    pub async fn get_database_metrics(&self) -> DatabaseMetrics {
+        if let Some(ref database) = self.database {
+            self.fetch_database_metrics(database)
+                .await
+                .unwrap_or_default()
+        } else {
+            DatabaseMetrics::default()
+        }
+    }
+
+    async fn fetch_database_metrics(
+        &self,
+        database: &DatabaseService,
+    ) -> Result<DatabaseMetrics, Box<dyn std::error::Error + Send + Sync>> {
+        use chrono::{Duration as ChronoDuration, Utc};
+        use sea_orm::entity::prelude::Decimal;
+        use sea_orm::{DatabaseBackend, FromQueryResult, Statement};
+
+        let now = Utc::now().naive_utc();
+        let yesterday = now - ChronoDuration::hours(24);
+        let fifteen_minutes_ago = now - ChronoDuration::minutes(15);
+
+        // Single optimized query to get all metrics at once with hashrate calculations in SQL
+        let query = format!(
+            r#"
+            SELECT 
+                (SELECT COUNT(*) FROM miners) as total_miners,
+                (SELECT COUNT(*) FROM workers) as total_workers,
+                (SELECT COUNT(*) FROM workers WHERE last_seen >= '{}') as active_miners_24h,
+                
+                -- 15 minute metrics
+                (SELECT COUNT(*) FROM submissions WHERE submitted_at >= '{}') as total_submissions_15m,
+                (SELECT COUNT(*) FROM submissions WHERE submitted_at >= '{}' AND valid = true) as valid_count_15m,
+                (SELECT COUNT(*) FROM submissions WHERE submitted_at >= '{}' AND valid = false) as invalid_count_15m,
+                (SELECT COALESCE(SUM(hashes), 0) / (15.0 * 60.0 * 1e12) FROM submissions WHERE submitted_at >= '{}' AND valid = true) as hashrate_15m_th,
+                
+                -- 24 hour metrics  
+                (SELECT COUNT(*) FROM submissions WHERE submitted_at >= '{}') as total_submissions_24h,
+                (SELECT COUNT(*) FROM submissions WHERE submitted_at >= '{}' AND valid = true) as valid_count_24h,
+                (SELECT COUNT(*) FROM submissions WHERE submitted_at >= '{}' AND valid = false) as invalid_count_24h,
+                (SELECT COALESCE(SUM(hashes), 0) / (24.0 * 3600.0 * 1e12) FROM submissions WHERE submitted_at >= '{}' AND valid = true) as hashrate_24h_th
+            "#,
+            yesterday.format("%Y-%m-%d %H:%M:%S%.3f"),
+            fifteen_minutes_ago.format("%Y-%m-%d %H:%M:%S%.3f"),
+            fifteen_minutes_ago.format("%Y-%m-%d %H:%M:%S%.3f"),
+            fifteen_minutes_ago.format("%Y-%m-%d %H:%M:%S%.3f"),
+            fifteen_minutes_ago.format("%Y-%m-%d %H:%M:%S%.3f"),
+            yesterday.format("%Y-%m-%d %H:%M:%S%.3f"),
+            yesterday.format("%Y-%m-%d %H:%M:%S%.3f"),
+            yesterday.format("%Y-%m-%d %H:%M:%S%.3f"),
+            yesterday.format("%Y-%m-%d %H:%M:%S%.3f"),
+        );
+
+        // Define a struct to capture the query result
+        #[derive(FromQueryResult)]
+        struct MetricsQueryResult {
+            total_miners: i64,
+            total_workers: i64,
+            active_miners_24h: i64,
+            total_submissions_15m: i64,
+            valid_count_15m: i64,
+            invalid_count_15m: i64,
+            hashrate_15m_th: Decimal,
+            total_submissions_24h: i64,
+            valid_count_24h: i64,
+            invalid_count_24h: i64,
+            hashrate_24h_th: Decimal,
+        }
+
+        let stmt = Statement::from_string(DatabaseBackend::Postgres, query);
+        let result = MetricsQueryResult::find_by_statement(stmt)
+            .one(&database.connection)
+            .await?
+            .ok_or("No results returned from metrics query")?;
+
+        // Calculate acceptance rates
+        let acceptance_rate_15m = if result.total_submissions_15m > 0 {
+            result.valid_count_15m as f64 / result.total_submissions_15m as f64
+        } else {
+            0.0
+        };
+
+        let acceptance_rate_24h = if result.total_submissions_24h > 0 {
+            result.valid_count_24h as f64 / result.total_submissions_24h as f64
+        } else {
+            0.0
+        };
+
+        // Convert SQL-calculated hashrates from Decimal to f64 (already in TH/s)
+        let estimated_hashrate_15m_th: f64 = result.hashrate_15m_th.try_into().unwrap_or(0.0);
+        let estimated_hashrate_24h_th: f64 = result.hashrate_24h_th.try_into().unwrap_or(0.0);
+
+        Ok(DatabaseMetrics {
+            total_miners: result.total_miners as u64,
+            active_miners_24h: result.active_miners_24h as u64,
+            total_workers: result.total_workers as u64,
+            active_workers_24h: result.active_miners_24h as u64, // Same as miners for now
+            total_submissions_15m: result.total_submissions_15m as u64,
+            valid_submissions_15m: result.valid_count_15m as u64,
+            invalid_submissions_15m: result.invalid_count_15m as u64,
+            total_submissions_24h: result.total_submissions_24h as u64,
+            valid_submissions_24h: result.valid_count_24h as u64,
+            invalid_submissions_24h: result.invalid_count_24h as u64,
+            acceptance_rate_15m,
+            acceptance_rate_24h,
+            estimated_hashrate_15m: estimated_hashrate_15m_th,
+            estimated_hashrate_24h: estimated_hashrate_24h_th,
+        })
+    }
+
+    /// Get combined metrics summary (in-memory + database)
+    pub async fn get_combined_summary(&self) -> String {
+        let snapshot = self.get_global_snapshot();
+        let calculated = snapshot.calculated_metrics();
+        let db_metrics = self.get_database_metrics().await;
+
+        format!(
+            "Loka Stratum Metrics Summary:\n\
+             \n\
+             == Real-time Metrics (In-Memory) ==\n\
+             Active Connections: {}\n\
+             Messages: {} received, {} sent\n\
+             Auth Success Rate: {:.1}%\n\
+             Submission Acceptance Rate: {:.1}%\n\
+             Avg Response Time: {:.1}ms\n\
+             Current Hashrate: {:.2} MH/s\n\
+             Security Violations: {}\n\
+             \n\
+             == Historical Metrics (Database) ==\n\
+             Total Miners: {}\n\
+             Active Miners (24h): {}\n\
+             Total Workers: {}\n\
+             \n\
+             15min Submissions: {} (valid: {}, invalid: {})\n\
+             Acceptance Rate (15min): {:.1}%\n\
+             Hashrate (15min): {:.2} TH/s\n\
+             \n\
+             24h Submissions: {} (valid: {}, invalid: {})\n\
+             Acceptance Rate (24h): {:.1}%\n\
+             Hashrate (24h): {:.2} TH/s",
+            snapshot.active_connections,
+            snapshot.messages_received,
+            snapshot.messages_sent,
+            calculated.auth_success_rate * 100.0,
+            calculated.submission_acceptance_rate * 100.0,
+            snapshot.avg_response_time_ms,
+            snapshot.hashrate_estimate / 1_000_000.0, // Convert to MH/s
+            snapshot.security_violations,
+            db_metrics.total_miners,
+            db_metrics.active_miners_24h,
+            db_metrics.total_workers,
+            db_metrics.total_submissions_15m,
+            db_metrics.valid_submissions_15m,
+            db_metrics.invalid_submissions_15m,
+            db_metrics.acceptance_rate_15m * 100.0,
+            db_metrics.estimated_hashrate_15m, // Already in TH/s
+            db_metrics.total_submissions_24h,
+            db_metrics.valid_submissions_24h,
+            db_metrics.invalid_submissions_24h,
+            db_metrics.acceptance_rate_24h * 100.0,
+            db_metrics.estimated_hashrate_24h, // Already in TH/s
+        )
+    }
+
+    /// Get metrics summary as human-readable string (legacy method for compatibility)
     pub fn get_summary(&self) -> String {
         let snapshot = self.get_global_snapshot();
         let calculated = snapshot.calculated_metrics();
@@ -786,7 +1005,6 @@ impl Default for MetricsService {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tokio::time::sleep;
 
     #[test]
     fn test_atomic_metrics() {
@@ -807,11 +1025,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_time_series_metrics() {
+        dotenvy::dotenv().ok();
+
         let time_series = TimeSeriesMetrics::new(3);
 
         // Add snapshots
         for i in 1..=5 {
-            let mut snapshot = MetricsSnapshot {
+            let snapshot = MetricsSnapshot {
                 timestamp: SystemTime::now(),
                 total_connections: i,
                 active_connections: i,
