@@ -2,7 +2,6 @@
 mod tests {
     use std::sync::Arc;
     use std::sync::atomic::Ordering;
-    use std::time::Duration;
 
     use loka_stratum::services::metrics::{AtomicMetrics, MetricsSnapshot};
 
@@ -30,7 +29,7 @@ mod tests {
                     .job_distribution_latency_sum_ms_bits
                     .load(Ordering::Relaxed),
             );
-            let prev_count = metrics
+            let _prev_count = metrics
                 .job_distribution_latency_count
                 .load(Ordering::Relaxed);
             metrics
@@ -107,7 +106,7 @@ mod tests {
         }
 
         // Get metrics snapshot and verify
-        let snapshot = MetricsSnapshot::from_atomic(metrics.as_ref());
+        let _snapshot = MetricsSnapshot::from_atomic(metrics.as_ref());
 
         // Verify share metrics
         assert_eq!(
@@ -123,8 +122,7 @@ mod tests {
             as f64;
         assert!(
             acceptance_rate > 0.7 && acceptance_rate < 0.9,
-            "Expected acceptance rate around 80%, got {}",
-            acceptance_rate
+            "Expected acceptance rate around 80%, got {acceptance_rate}"
         );
 
         // Verify difficulty adjustments
@@ -151,8 +149,7 @@ mod tests {
             .load(Ordering::Relaxed) as f64;
         assert!(
             avg_latency > 10.0 && avg_latency < 20.0,
-            "Expected average latency between 10-20ms, got {}",
-            avg_latency
+            "Expected average latency between 10-20ms, got {avg_latency}"
         );
         assert_eq!(
             f64::from_bits(
@@ -222,7 +219,7 @@ mod tests {
             "  Current difficulty: {}",
             f64::from_bits(metrics.current_difficulty_bits.load(Ordering::Relaxed))
         );
-        println!("  Job distribution latency: {:.2}ms avg", avg_latency);
+        println!("  Job distribution latency: {avg_latency:.2}ms avg");
         println!(
             "  Stale shares: {}",
             metrics.stale_shares_counter.load(Ordering::Relaxed)

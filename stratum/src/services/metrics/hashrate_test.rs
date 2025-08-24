@@ -21,9 +21,7 @@ mod tests {
 
         assert!(
             (hashrate - expected).abs() < 1.0,
-            "Basic hashrate calculation failed: expected {:.2}, got {:.2}",
-            expected,
-            hashrate
+            "Basic hashrate calculation failed: expected {expected:.2}, got {hashrate:.2}"
         );
 
         println!(
@@ -50,10 +48,7 @@ mod tests {
 
             assert!(
                 (hashrate - expected).abs() < 1.0,
-                "{} failed: expected {:.2}, got {:.2}",
-                description,
-                expected,
-                hashrate
+                "{description} failed: expected {expected:.2}, got {hashrate:.2}"
             );
 
             println!(
@@ -164,10 +159,7 @@ mod tests {
 
             assert!(
                 hashrate >= min_expected && hashrate <= max_expected,
-                "Hashrate {:.2} should be between {:.2} and {:.2}",
-                hashrate,
-                min_expected,
-                max_expected
+                "Hashrate {hashrate:.2} should be between {min_expected:.2} and {max_expected:.2}"
             );
         } else {
             println!("ℹ️  Hashrate is 0 (window timing not met - this is expected in fast tests)");
@@ -218,7 +210,7 @@ mod tests {
         let metrics = Arc::new(AtomicMetrics::new());
 
         // Test multiple difficulty changes
-        let difficulties = vec![1.0, 10.0, 100.0, 1000.0, 500.0];
+        let difficulties = [1.0, 10.0, 100.0, 1000.0, 500.0];
 
         for (i, &diff) in difficulties.iter().enumerate() {
             metrics.update_difficulty(diff);
@@ -346,11 +338,7 @@ pub mod test_helpers {
 
         assert!(
             (actual - expected).abs() <= tolerance,
-            "Hashrate {:.2} not within {:.1}% of expected {:.2} (tolerance: {:.2})",
-            actual,
-            tolerance_percent,
-            expected,
-            tolerance
+            "Hashrate {actual:.2} not within {tolerance_percent:.1}% of expected {expected:.2} (tolerance: {tolerance:.2})"
         );
     }
 }

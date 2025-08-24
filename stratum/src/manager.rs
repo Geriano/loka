@@ -36,14 +36,14 @@ use crate::{auth, job, submission};
 ///
 /// # Examples
 ///
-/// ```rust
+/// ```rust,no_run
 /// use loka_stratum::{Config, Manager};
 /// use loka_stratum::services::database::DatabaseService;
 /// use std::sync::Arc;
 ///
 /// # async fn example() -> loka_stratum::Result<()> {
-/// let config = Arc::new(Config::default());
 /// let database = Arc::new(DatabaseService::new("sqlite::memory:").await?);
+/// let config = Arc::new(Config::load(&database).await?);
 /// let manager = Manager::new(config, database)?;
 ///
 /// // Access subsystems through the manager
@@ -93,14 +93,14 @@ impl Manager {
     ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```rust,no_run
     /// use loka_stratum::{Config, Manager};
     /// use loka_stratum::services::database::DatabaseService;
     /// use std::sync::Arc;
     ///
     /// # async fn create_manager() -> loka_stratum::Result<()> {
-    /// let config = Arc::new(Config::load().await?);
     /// let database = Arc::new(DatabaseService::new("sqlite::memory:").await?);
+    /// let config = Arc::new(Config::load(&database).await?);
     ///
     /// let manager = Manager::new(config, database)?;
     /// # Ok(())

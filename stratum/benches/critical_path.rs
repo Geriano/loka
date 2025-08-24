@@ -110,21 +110,21 @@ fn bench_stratum_parsing(c: &mut Criterion) {
     c.bench_function("parse_simple_message", |b| {
         b.iter(|| {
             let _result = parser.parse_message(black_box(simple_message));
-            black_box(_result);
+            let _ = black_box(_result);
         })
     });
 
     c.bench_function("parse_complex_message", |b| {
         b.iter(|| {
             let _result = parser.parse_message(black_box(complex_message));
-            black_box(_result);
+            let _ = black_box(_result);
         })
     });
 
     c.bench_function("parse_malformed_message", |b| {
         b.iter(|| {
             let _result = parser.parse_message(black_box(malformed_message));
-            black_box(_result);
+            let _ = black_box(_result);
         })
     });
 
@@ -140,7 +140,7 @@ fn bench_stratum_parsing(c: &mut Criterion) {
                 b.iter(|| {
                     for msg in &messages {
                         let _result = parser.parse_message(black_box(msg));
-                        black_box(_result);
+                        let _ = black_box(_result);
                     }
                 });
             },
@@ -366,8 +366,8 @@ fn bench_concurrent_structures(c: &mut Criterion) {
 
     // Populate with some data
     for i in 0..1000 {
-        dashmap.insert(format!("key_{}", i), i);
-        hashmap.write().unwrap().insert(format!("key_{}", i), i);
+        dashmap.insert(format!("key_{i}"), i);
+        hashmap.write().unwrap().insert(format!("key_{i}"), i);
     }
 
     c.bench_function("dashmap_read", |b| {
@@ -390,7 +390,7 @@ fn bench_concurrent_structures(c: &mut Criterion) {
     c.bench_function("dashmap_write", |b| {
         let mut counter = 0;
         b.iter(|| {
-            let key = format!("new_key_{}", counter);
+            let key = format!("new_key_{counter}");
             dashmap.insert(key, black_box(counter));
             counter += 1;
         })
@@ -399,7 +399,7 @@ fn bench_concurrent_structures(c: &mut Criterion) {
     c.bench_function("hashmap_write", |b| {
         let mut counter = 0;
         b.iter(|| {
-            let key = format!("new_key_{}", counter);
+            let key = format!("new_key_{counter}");
             hashmap.write().unwrap().insert(key, black_box(counter));
             counter += 1;
         })

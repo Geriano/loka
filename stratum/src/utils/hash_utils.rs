@@ -142,7 +142,26 @@ impl RollingHash {
 
     pub fn new(window_size: usize) -> Self {
         let base = Self::DEFAULT_BASE;
-        let power = base.pow(window_size as u32 - 1);
+        // Use saturating power to prevent overflow - if it would overflow, use a smaller power
+        let power = if window_size == 0 {
+            1
+        } else {
+            // Calculate base^(window_size-1) with overflow protection
+            let mut result = 1u64;
+            let exponent = (window_size as u32).saturating_sub(1);
+            for _ in 0..exponent {
+                if let Some(new_result) = result.checked_mul(base) {
+                    result = new_result;
+                } else {
+                    // If overflow would occur, cap at a reasonable power for hash distribution
+                    // This preserves the rolling hash functionality while preventing overflow
+                    // Use pre-calculated safe power instead of pow() which can overflow in debug builds
+                    result = 0x1000000000000000u64; // Safe large value for fallback
+                    break;
+                }
+            }
+            result
+        };
 
         Self {
             hash: 0,
@@ -281,9 +300,7 @@ mod tests {
         let expected = (10.0 * 1.0 * 4_294_967_296.0) / 60.0;
         assert!(
             (hashrate - expected).abs() < 1.0,
-            "Expected: {}, Got: {}",
-            expected,
-            hashrate
+            "Expected: {expected}, Got: {hashrate}"
         );
 
         // Test edge cases

@@ -25,7 +25,7 @@ use crate::protocol::messages::StratumMessage;
 /// # Examples
 ///
 /// ```rust
-/// use loka_stratum::protocol::handler::StratumHandler;
+/// use loka_stratum::protocol::handler::stratum_handler::StratumHandler;
 ///
 /// let handler = StratumHandler::new();
 /// // Handler processes parsed Stratum messages

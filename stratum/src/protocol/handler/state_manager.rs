@@ -41,12 +41,22 @@ use super::stratum_handler::StratumHandler;
 ///
 /// # Examples
 ///
-/// ```rust
+/// ```rust,no_run
 /// use loka_stratum::protocol::handler::ProtocolHandler;
+/// use loka_stratum::{Manager, Config};
+/// use loka_stratum::services::database::DatabaseService;
 /// use std::sync::Arc;
+/// use std::net::SocketAddr;
 ///
+/// # async fn example() -> loka_stratum::Result<()> {
+/// let database = Arc::new(DatabaseService::new("sqlite::memory:").await?);
+/// let config = Arc::new(Config::load(&database).await?);
+/// let manager = Arc::new(Manager::new(config.clone(), database)?);
+/// let addr: SocketAddr = "127.0.0.1:3333".parse().unwrap();
 /// let handler = ProtocolHandler::new(manager, config, addr, None);
 /// // Handler automatically routes messages based on protocol detection
+/// # Ok(())
+/// # }
 /// ```
 #[derive(Debug)]
 pub struct ProtocolHandler {

@@ -28,11 +28,26 @@ use super::stratum_handler::StratumHandler;
 ///
 /// # Examples
 ///
-/// ```rust
-/// use loka_stratum::protocol::handler::MessageProcessor;
+/// ```rust,no_run
+/// use loka_stratum::protocol::handler::message_processor::MessageProcessor;
+/// use loka_stratum::protocol::handler::http_handler::HttpHandler;
+/// use loka_stratum::protocol::handler::stratum_handler::StratumHandler;
+/// use loka_stratum::protocol::pipeline::MessagePipeline;
+/// use loka_stratum::services::pool_config::{PoolConfigService, PoolConfigServiceConfig};
+/// use loka_stratum::services::database::DatabaseService;
+/// use std::sync::Arc;
 ///
+/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+/// let database = Arc::new(DatabaseService::new("sqlite::memory:").await?);
+/// let config = PoolConfigServiceConfig::default();
+/// let pool_service = Arc::new(PoolConfigService::new(database, config));
+/// let pipeline = MessagePipeline::default();
+/// let http_handler = HttpHandler::new(pool_service);
+/// let stratum_handler = StratumHandler::new();
 /// let processor = MessageProcessor::new(pipeline, http_handler, stratum_handler);
 /// // Process raw messages from network connection
+/// # Ok(())
+/// # }
 /// ```
 #[derive(Debug, Clone)]
 pub struct MessageProcessor {

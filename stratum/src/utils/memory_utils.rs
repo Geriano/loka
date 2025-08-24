@@ -1,6 +1,11 @@
 use std::mem;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 
+/// Type alias for factory functions
+type Factory<T> = Box<dyn Fn() -> T + Send + Sync>;
+/// Type alias for reset functions  
+type ResetFn<T> = Box<dyn Fn(&mut T) + Send + Sync>;
+
 /// Memory allocation tracking and optimization utilities
 pub struct MemoryTracker {
     total_allocated: AtomicU64,
@@ -92,9 +97,9 @@ pub struct ObjectPool<T> {
     // Using a simplified lock-free approach by always creating new objects
     // This eliminates lock contention in favor of allocation overhead
     // which is acceptable for most use cases in async contexts
-    factory: Box<dyn Fn() -> T + Send + Sync>,
+    factory: Factory<T>,
     #[allow(dead_code)]
-    reset: Option<Box<dyn Fn(&mut T) + Send + Sync>>,
+    reset: Option<ResetFn<T>>,
     max_size: usize,
     created_count: AtomicUsize,
     reused_count: AtomicUsize, // Always 0 in this simplified version

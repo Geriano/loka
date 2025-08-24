@@ -405,10 +405,10 @@ impl StringOptimizer {
             // Skip whitespace
             let json_after_field = json_after_field.trim_start();
 
-            if json_after_field.starts_with('"') {
+            if let Some(stripped) = json_after_field.strip_prefix('"') {
                 // String value
-                if let Some(end_quote) = json_after_field[1..].find('"') {
-                    return Some(&json_after_field[1..end_quote + 1]);
+                if let Some(end_quote) = stripped.find('"') {
+                    return Some(&stripped[..end_quote]);
                 }
             } else {
                 // Number or boolean value

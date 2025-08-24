@@ -27,12 +27,21 @@ use crate::services::pool_config::PoolConfigService;
 ///
 /// # Examples
 ///
-/// ```rust
-/// use loka_stratum::protocol::handler::HttpHandler;
+/// ```rust,no_run
+/// use loka_stratum::protocol::handler::http_handler::HttpHandler;
+/// use loka_stratum::services::pool_config::{PoolConfigService, PoolConfigServiceConfig};
+/// use loka_stratum::services::database::DatabaseService;
+/// use std::sync::Arc;
 ///
-/// let handler = HttpHandler::new();
-/// let is_http = handler.is_direct_http_request("GET /status HTTP/1.1");
+/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+/// let database = Arc::new(DatabaseService::new("sqlite::memory:").await?);
+/// let config = PoolConfigServiceConfig::default();
+/// let pool_service = Arc::new(PoolConfigService::new(database, config));
+/// let handler = HttpHandler::new(pool_service);
+/// let is_http = HttpHandler::is_direct_http_request("GET /status HTTP/1.1");
 /// assert!(is_http);
+/// # Ok(())
+/// # }
 /// ```
 #[derive(Debug, Clone)]
 pub struct HttpHandler {
@@ -65,7 +74,7 @@ impl HttpHandler {
     /// # Examples
     ///
     /// ```rust
-    /// use loka_stratum::protocol::handler::HttpHandler;
+    /// use loka_stratum::protocol::handler::http_handler::HttpHandler;
     ///
     /// assert!(HttpHandler::is_direct_http_request("GET /status HTTP/1.1"));
     /// assert!(HttpHandler::is_direct_http_request("POST /submit HTTP/1.1"));
@@ -101,7 +110,7 @@ impl HttpHandler {
     /// # Examples
     ///
     /// ```rust
-    /// use loka_stratum::protocol::handler::HttpHandler;
+    /// use loka_stratum::protocol::handler::http_handler::HttpHandler;
     ///
     /// let path = HttpHandler::parse_http_request_path("GET /api/status HTTP/1.1");
     /// assert_eq!(path, Some("/api/status".to_string()));
@@ -288,7 +297,7 @@ impl HttpHandler {
     /// # Examples
     ///
     /// ```rust
-    /// use loka_stratum::protocol::handler::HttpHandler;
+    /// use loka_stratum::protocol::handler::http_handler::HttpHandler;
     ///
     /// let target = HttpHandler::parse_connect_target_from_message("CONNECT pool.example.com:4444 HTTP/1.1");
     /// assert_eq!(target, Some("pool.example.com:4444".to_string()));

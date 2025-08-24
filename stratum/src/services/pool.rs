@@ -11,6 +11,11 @@ use tracing::{debug, info, warn};
 
 use crate::error::{Result, StratumError};
 
+/// Type alias for cleanup callback functions
+type CleanupCallback = Box<dyn Fn() + Send + Sync>;
+/// Type alias for cleanup callback collection  
+type CleanupCallbacks = Arc<RwLock<Vec<CleanupCallback>>>;
+
 /// Configuration for connection pool
 #[derive(Debug, Clone)]
 pub struct PoolConfig {
@@ -449,12 +454,24 @@ impl ManagedConnection {
     }
 
     /// Get a reference to the connection
-    pub fn as_ref(&self) -> &TcpStream {
+    pub fn get_ref(&self) -> &TcpStream {
         self.connection.as_ref().expect("Connection already taken")
     }
 
     /// Get a mutable reference to the connection
-    pub fn as_mut(&mut self) -> &mut TcpStream {
+    pub fn get_mut(&mut self) -> &mut TcpStream {
+        self.connection.as_mut().expect("Connection already taken")
+    }
+}
+
+impl AsRef<TcpStream> for ManagedConnection {
+    fn as_ref(&self) -> &TcpStream {
+        self.connection.as_ref().expect("Connection already taken")
+    }
+}
+
+impl AsMut<TcpStream> for ManagedConnection {
+    fn as_mut(&mut self) -> &mut TcpStream {
         self.connection.as_mut().expect("Connection already taken")
     }
 }
@@ -495,7 +512,7 @@ pub struct ResourceManager {
     cpu_pressure_threshold: f64,
     cleanup_interval: Duration,
     is_running: Arc<AtomicBool>,
-    cleanup_callbacks: Arc<RwLock<Vec<Box<dyn Fn() + Send + Sync>>>>,
+    cleanup_callbacks: CleanupCallbacks,
 }
 
 impl ResourceManager {
@@ -588,7 +605,7 @@ impl Default for ResourceManager {
 struct ResourceManagerMonitor {
     cleanup_interval: Duration,
     is_running: Arc<AtomicBool>,
-    cleanup_callbacks: Arc<RwLock<Vec<Box<dyn Fn() + Send + Sync>>>>,
+    cleanup_callbacks: CleanupCallbacks,
     #[allow(unused)]
     memory_pressure_threshold: f64,
     #[allow(unused)]

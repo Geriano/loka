@@ -279,9 +279,10 @@ impl TaskManager {
 
     /// Get task statistics
     pub async fn get_statistics(&self) -> TaskManagerStatistics {
-        let mut stats = TaskManagerStatistics::default();
-
-        stats.total_active_tasks = self.tasks.len();
+        let mut stats = TaskManagerStatistics {
+            total_active_tasks: self.tasks.len(),
+            ..Default::default()
+        };
 
         for entry in self.tasks.iter() {
             let metadata = entry.value();

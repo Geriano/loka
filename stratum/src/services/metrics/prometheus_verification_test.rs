@@ -51,7 +51,7 @@ mod tests {
         let prometheus_output = snapshot.to_prometheus_format();
 
         println!("📊 Complete Prometheus Export:");
-        println!("{}", prometheus_output);
+        println!("{prometheus_output}");
 
         // Verify all critical hashrate metrics are present
         assert!(
@@ -95,16 +95,15 @@ mod tests {
                 // Verify metric line format
                 assert!(
                     line.contains(" "),
-                    "Metric line should contain space: {}",
-                    line
+                    "Metric line should contain space: {line}"
                 );
             }
         }
 
         println!("📋 Prometheus Format Analysis:");
-        println!("   - HELP lines: {}", help_count);
-        println!("   - TYPE lines: {}", type_count);
-        println!("   - Metric lines: {}", metric_count);
+        println!("   - HELP lines: {help_count}");
+        println!("   - TYPE lines: {type_count}");
+        println!("   - Metric lines: {metric_count}");
 
         assert!(help_count > 0, "Should have HELP lines");
         assert!(type_count > 0, "Should have TYPE lines");
@@ -115,9 +114,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_metrics_service_prometheus_integration() {
-        let mut config = MetricsConfig::default();
-        config.hashrate_calculation_interval = Duration::from_millis(100);
-        config.hashrate_time_window = Duration::from_secs(5);
+        let config = MetricsConfig {
+            hashrate_calculation_interval: Duration::from_millis(100),
+            hashrate_time_window: Duration::from_secs(5),
+            ..Default::default()
+        };
 
         let metrics_service = MetricsService::new(config);
 
@@ -148,7 +149,7 @@ mod tests {
         // Show sample of key metrics
         for line in prometheus_export.lines().take(20) {
             if line.contains("stratum_") && !line.starts_with("#") {
-                println!("   {}", line);
+                println!("   {line}");
             }
         }
     }
@@ -190,7 +191,7 @@ mod tests {
         let snapshot = metrics.snapshot();
 
         println!("🔍 Realistic Mining Scenario Results:");
-        println!("   - Pool difficulty: {}", pool_difficulty);
+        println!("   - Pool difficulty: {pool_difficulty}");
         println!("   - Total shares: {}", snapshot.share_submissions);
         println!("   - Accepted shares: {}", snapshot.submissions_accepted);
         println!("   - Rejected shares: {}", snapshot.submissions_rejected);
@@ -198,7 +199,7 @@ mod tests {
             "   - Acceptance rate: {:.2}%",
             snapshot.share_acceptance_rate * 100.0
         );
-        println!("   - Calculated hashrate: {:.2} H/s", hashrate);
+        println!("   - Calculated hashrate: {hashrate:.2} H/s");
         println!(
             "   - Calculated hashrate: {:.2} MH/s",
             hashrate / 1_000_000.0
@@ -216,20 +217,15 @@ mod tests {
 
             assert!(
                 hashrate >= expected_min,
-                "Hashrate {:.2} should be >= {:.2}",
-                hashrate,
-                expected_min
+                "Hashrate {hashrate:.2} should be >= {expected_min:.2}"
             );
             assert!(
                 hashrate <= expected_max,
-                "Hashrate {:.2} should be <= {:.2}",
-                hashrate,
-                expected_max
+                "Hashrate {hashrate:.2} should be <= {expected_max:.2}"
             );
 
             println!(
-                "✅ Hashrate is within expected bounds ({:.2} - {:.2} H/s)",
-                expected_min, expected_max
+                "✅ Hashrate is within expected bounds ({expected_min:.2} - {expected_max:.2} H/s)"
             );
         } else {
             println!("ℹ️  Hashrate is 0 (timing window not met - acceptable in tests)");
@@ -244,7 +240,7 @@ mod tests {
 
         println!("📊 Prometheus Hashrate Metrics:");
         for line in hashrate_lines {
-            println!("   {}", line);
+            println!("   {line}");
         }
 
         println!("✅ Realistic scenario verification complete");

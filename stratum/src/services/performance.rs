@@ -401,12 +401,24 @@ impl<T> PooledItem<T> {
     }
 
     /// Get a reference to the pooled item
-    pub fn as_ref(&self) -> &T {
+    pub fn get_ref(&self) -> &T {
         self.item.as_ref().unwrap()
     }
 
     /// Get a mutable reference to the pooled item
-    pub fn as_mut(&mut self) -> &mut T {
+    pub fn get_mut(&mut self) -> &mut T {
+        self.item.as_mut().unwrap()
+    }
+}
+
+impl<T> AsRef<T> for PooledItem<T> {
+    fn as_ref(&self) -> &T {
+        self.item.as_ref().unwrap()
+    }
+}
+
+impl<T> AsMut<T> for PooledItem<T> {
+    fn as_mut(&mut self) -> &mut T {
         self.item.as_mut().unwrap()
     }
 }

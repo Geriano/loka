@@ -15,6 +15,7 @@ use std::time::{Duration, SystemTime};
 ///
 /// ```rust
 /// use loka_stratum::services::metrics::DatabaseMetrics;
+/// use std::time::Duration;
 ///
 /// let mut db_metrics = DatabaseMetrics::default();
 ///
@@ -178,9 +179,9 @@ impl DatabaseMetrics {
     /// * `table` - Table name where records were updated
     /// * `count` - Number of records updated
     pub fn record_update(&mut self, table: &str, count: u64) {
-        match table {
-            "miners" => self.miners_updated += count,
-            _ => {} // Other tables updates can be added as needed
+        if table == "miners" {
+            self.miners_updated += count;
+            // Other tables updates can be added as needed
         }
         self.last_updated = SystemTime::now();
     }

@@ -401,10 +401,10 @@ async fn get_prometheus_metrics() -> Result<String, StatusCode> {
         // prometheus_output
         //     .push_str("# HELP stratum_total_connections Total number of connections established\n");
         prometheus_output.push_str(STRATUM_TOTAL_CONNECTIONS_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         // prometheus_output.push_str("# TYPE stratum_total_connections counter\n");
         prometheus_output.push_str(STRATUM_TOTAL_CONNECTIONS_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_total_connections {}\n",
             global.total_connections
@@ -413,19 +413,19 @@ async fn get_prometheus_metrics() -> Result<String, StatusCode> {
         // prometheus_output
         //     .push_str("# HELP stratum_active_connections Current number of active connections\n");
         prometheus_output.push_str(STRATUM_ACTIVE_CONNECTIONS_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         // prometheus_output.push_str("# TYPE stratum_active_connections gauge\n");
         prometheus_output.push_str(STRATUM_ACTIVE_CONNECTIONS_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_active_connections {}\n",
             global.active_connections
         ));
 
         prometheus_output.push_str(STRATUM_CONNECTION_ERRORS_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_CONNECTION_ERRORS_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_connection_errors {}\n",
             global.connection_errors
@@ -433,63 +433,63 @@ async fn get_prometheus_metrics() -> Result<String, StatusCode> {
 
         // Connection lifecycle metrics (Task 8.1)
         prometheus_output.push_str(STRATUM_CONNECTION_DURATION_AVG_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_CONNECTION_DURATION_AVG_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_connection_duration_avg_seconds {:.6}\n",
             global.avg_connection_duration_ms / 1000.0
         ));
 
         prometheus_output.push_str(STRATUM_CONNECTION_DURATION_MAX_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_CONNECTION_DURATION_MAX_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_connection_duration_max_seconds {:.6}\n",
             global.max_connection_duration_ms / 1000.0
         ));
 
         prometheus_output.push_str(STRATUM_CONNECTION_DURATION_MIN_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_CONNECTION_DURATION_MIN_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_connection_duration_min_seconds {:.6}\n",
             global.min_connection_duration_ms / 1000.0
         ));
 
         prometheus_output.push_str(STRATUM_IDLE_TIME_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_IDLE_TIME_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_idle_time_seconds {:.6}\n",
             global.idle_time_ms / 1000.0
         ));
 
         prometheus_output.push_str(STRATUM_RECONNECTION_ATTEMPTS_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_RECONNECTION_ATTEMPTS_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_reconnection_attempts_total {}\n",
             global.reconnection_attempts
         ));
 
         prometheus_output.push_str(STRATUM_CONNECTION_ESTABLISHED_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_CONNECTION_ESTABLISHED_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_connection_established_total {}\n",
             global.connections_established
         ));
 
         prometheus_output.push_str(STRATUM_CONNECTION_CLOSED_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_CONNECTION_CLOSED_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_connection_closed_total {}\n",
             global.connections_closed
@@ -497,72 +497,72 @@ async fn get_prometheus_metrics() -> Result<String, StatusCode> {
 
         // Protocol detection metrics (Task 8.2)
         prometheus_output.push_str(STRATUM_HTTP_REQUESTS_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_HTTP_REQUESTS_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_http_requests_total {}\n",
             global.http_requests
         ));
 
         prometheus_output.push_str(STRATUM_STRATUM_REQUESTS_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_STRATUM_REQUESTS_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_stratum_requests_total {}\n",
             global.stratum_requests
         ));
 
         prometheus_output.push_str(STRATUM_PROTOCOL_DETECTION_FAILURES_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_PROTOCOL_DETECTION_FAILURES_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_protocol_detection_failures_total {}\n",
             global.protocol_detection_failures
         ));
 
         prometheus_output.push_str(STRATUM_PROTOCOL_DETECTION_SUCCESSES_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_PROTOCOL_DETECTION_SUCCESSES_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_protocol_detection_successes_total {}\n",
             global.protocol_detection_successes
         ));
 
         prometheus_output.push_str(STRATUM_PROTOCOL_CONVERSION_SUCCESS_RATE_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_PROTOCOL_CONVERSION_SUCCESS_RATE_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_protocol_conversion_success_rate {:.6}\n",
             global.protocol_conversion_success_rate
         ));
 
         prometheus_output.push_str(STRATUM_PROTOCOL_CONVERSION_ERRORS_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_PROTOCOL_CONVERSION_ERRORS_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_protocol_conversion_errors_total {}\n",
             global.protocol_conversion_errors
         ));
 
         prometheus_output.push_str(STRATUM_HTTP_CONNECT_REQUESTS_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_HTTP_CONNECT_REQUESTS_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_http_connect_requests_total {}\n",
             global.http_connect_requests
         ));
 
         prometheus_output.push_str(STRATUM_DIRECT_STRATUM_CONNECTIONS_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_DIRECT_STRATUM_CONNECTIONS_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_direct_stratum_connections_total {}\n",
             global.direct_stratum_connections
@@ -570,18 +570,18 @@ async fn get_prometheus_metrics() -> Result<String, StatusCode> {
 
         // Mining operation metrics (Task 8.3)
         prometheus_output.push_str(STRATUM_SHARE_SUBMISSIONS_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_SHARE_SUBMISSIONS_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_share_submissions_total {}\n",
             global.submissions_received
         ));
 
         prometheus_output.push_str(STRATUM_SHARE_ACCEPTANCE_RATE_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_SHARE_ACCEPTANCE_RATE_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         let acceptance_rate = if global.submissions_received > 0 {
             global.submissions_accepted as f64 / global.submissions_received as f64
         } else {
@@ -592,72 +592,72 @@ async fn get_prometheus_metrics() -> Result<String, StatusCode> {
         ));
 
         prometheus_output.push_str(STRATUM_DIFFICULTY_ADJUSTMENTS_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_DIFFICULTY_ADJUSTMENTS_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_difficulty_adjustments_total {}\n",
             global.difficulty_adjustments
         ));
 
         prometheus_output.push_str(STRATUM_JOB_DISTRIBUTION_LATENCY_AVG_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_JOB_DISTRIBUTION_LATENCY_AVG_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_job_distribution_latency_avg_seconds {:.6}\n",
             global.avg_job_distribution_latency_ms / 1000.0
         ));
 
         prometheus_output.push_str(STRATUM_JOB_DISTRIBUTION_LATENCY_MAX_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_JOB_DISTRIBUTION_LATENCY_MAX_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_job_distribution_latency_max_seconds {:.6}\n",
             global.max_job_distribution_latency_ms / 1000.0
         ));
 
         prometheus_output.push_str(STRATUM_JOB_DISTRIBUTION_LATENCY_MIN_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_JOB_DISTRIBUTION_LATENCY_MIN_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_job_distribution_latency_min_seconds {:.6}\n",
             global.min_job_distribution_latency_ms / 1000.0
         ));
 
         prometheus_output.push_str(STRATUM_CURRENT_DIFFICULTY_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_CURRENT_DIFFICULTY_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_current_difficulty {:.2}\n",
             global.current_difficulty
         ));
 
         prometheus_output.push_str(STRATUM_SHARES_PER_MINUTE_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_SHARES_PER_MINUTE_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_shares_per_minute {}\n",
             global.shares_per_minute
         ));
 
         prometheus_output.push_str(STRATUM_STALE_SHARES_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_STALE_SHARES_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_stale_shares_total {}\n",
             global.stale_shares
         ));
 
         prometheus_output.push_str(STRATUM_DUPLICATE_SHARES_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_DUPLICATE_SHARES_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_duplicate_shares_total {}\n",
             global.duplicate_submissions
@@ -665,90 +665,90 @@ async fn get_prometheus_metrics() -> Result<String, StatusCode> {
 
         // Error categorization metrics (Task 8.4)
         prometheus_output.push_str(STRATUM_NETWORK_ERRORS_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_NETWORK_ERRORS_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_network_errors_total {}\n",
             global.network_errors
         ));
 
         prometheus_output.push_str(STRATUM_AUTHENTICATION_FAILURES_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_AUTHENTICATION_FAILURES_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_authentication_failures_total {}\n",
             global.authentication_failures
         ));
 
         prometheus_output.push_str(STRATUM_TIMEOUT_ERRORS_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_TIMEOUT_ERRORS_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_timeout_errors {}\n",
             global.timeout_errors
         ));
 
         prometheus_output.push_str(STRATUM_PROTOCOL_PARSE_ERRORS_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_PROTOCOL_PARSE_ERRORS_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_protocol_parse_errors {}\n",
             global.protocol_parse_errors
         ));
 
         prometheus_output.push_str(STRATUM_PROTOCOL_VERSION_ERRORS_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_PROTOCOL_VERSION_ERRORS_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_protocol_version_errors {}\n",
             global.protocol_version_errors
         ));
 
         prometheus_output.push_str(STRATUM_PROTOCOL_MESSAGE_ERRORS_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_PROTOCOL_MESSAGE_ERRORS_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_protocol_message_errors {}\n",
             global.protocol_message_errors
         ));
 
         prometheus_output.push_str(STRATUM_VALIDATION_ERRORS_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_VALIDATION_ERRORS_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_validation_errors {}\n",
             global.validation_errors
         ));
 
         prometheus_output.push_str(STRATUM_SECURITY_VIOLATION_ERRORS_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_SECURITY_VIOLATION_ERRORS_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_security_violation_errors {}\n",
             global.security_violation_errors
         ));
 
         prometheus_output.push_str(STRATUM_RESOURCE_EXHAUSTION_ERRORS_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_RESOURCE_EXHAUSTION_ERRORS_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_resource_exhaustion_errors {}\n",
             global.resource_exhaustion_errors
         ));
 
         prometheus_output.push_str(STRATUM_INTERNAL_ERRORS_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_INTERNAL_ERRORS_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_internal_errors {}\n",
             global.internal_errors
@@ -756,72 +756,72 @@ async fn get_prometheus_metrics() -> Result<String, StatusCode> {
 
         // Resource utilization metrics (Task 8.5) - Fixed naming to match alert rules
         prometheus_output.push_str(STRATUM_MEMORY_USAGE_AVG_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_MEMORY_USAGE_AVG_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_memory_usage_per_connection_avg_mb {:.2}\n",
             global.avg_memory_per_connection_mb
         ));
 
         prometheus_output.push_str(STRATUM_MEMORY_USAGE_MAX_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_MEMORY_USAGE_MAX_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_memory_usage_per_connection_max_mb {:.2}\n",
             global.max_memory_per_connection_mb
         ));
 
         prometheus_output.push_str(STRATUM_MEMORY_USAGE_MIN_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_MEMORY_USAGE_MIN_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_memory_usage_per_connection_min_mb {:.2}\n",
             global.min_memory_per_connection_mb
         ));
 
         prometheus_output.push_str(STRATUM_CPU_UTILIZATION_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_CPU_UTILIZATION_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_cpu_utilization_current_percent {:.2}\n",
             global.cpu_utilization
         ));
 
         prometheus_output.push_str(STRATUM_NETWORK_BANDWIDTH_RX_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_NETWORK_BANDWIDTH_RX_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_network_bandwidth_rx_bytes_per_sec {}\n",
             global.network_bandwidth_rx_bps
         ));
 
         prometheus_output.push_str(STRATUM_NETWORK_BANDWIDTH_TX_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_NETWORK_BANDWIDTH_TX_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_network_bandwidth_tx_bytes_per_sec {}\n",
             global.network_bandwidth_tx_bps
         ));
 
         prometheus_output.push_str(STRATUM_CONNECTION_MEMORY_TOTAL_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_CONNECTION_MEMORY_TOTAL_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_connection_memory_total_bytes {}\n",
             global.connection_memory_total
         ));
 
         prometheus_output.push_str(STRATUM_CONNECTION_MEMORY_PEAK_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_CONNECTION_MEMORY_PEAK_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_connection_memory_peak_bytes {}\n",
             global.connection_memory_peak
@@ -829,45 +829,45 @@ async fn get_prometheus_metrics() -> Result<String, StatusCode> {
 
         // Additional missing critical metrics to match alert rules
         prometheus_output.push_str(STRATUM_CONNECTION_DURATION_AVG_MS_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_CONNECTION_DURATION_AVG_MS_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_connection_duration_avg_ms {:.2}\n",
             global.avg_connection_duration_ms
         ));
 
         prometheus_output.push_str(STRATUM_IDLE_TIME_GAUGE_MS_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_IDLE_TIME_GAUGE_MS_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_idle_time_gauge_ms {:.2}\n",
             global.idle_time_ms
         ));
 
         prometheus_output.push_str(STRATUM_RECONNECTION_ATTEMPTS_COUNTER_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_RECONNECTION_ATTEMPTS_COUNTER_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_reconnection_attempts_counter {}\n",
             global.reconnection_attempts
         ));
 
         prometheus_output.push_str(STRATUM_CONNECTION_ESTABLISHED_COUNTER_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_CONNECTION_ESTABLISHED_COUNTER_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_connection_established_counter {}\n",
             global.connections_established
         ));
 
         prometheus_output.push_str(STRATUM_CONNECTION_CLOSED_COUNTER_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_CONNECTION_CLOSED_COUNTER_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_connection_closed_counter {}\n",
             global.connections_closed
@@ -875,54 +875,53 @@ async fn get_prometheus_metrics() -> Result<String, StatusCode> {
 
         // Missing mining metrics needed by alert rules
         prometheus_output.push_str(STRATUM_PROTOCOL_CONVERSION_AVG_SUCCESS_RATE_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_PROTOCOL_CONVERSION_AVG_SUCCESS_RATE_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_protocol_conversion_avg_success_rate {:.6}\n",
             global.protocol_conversion_success_rate
         ));
 
         prometheus_output.push_str(STRATUM_SHARE_ACCEPTANCE_AVG_RATE_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_SHARE_ACCEPTANCE_AVG_RATE_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
-            "stratum_share_acceptance_avg_rate {:.6}\n",
-            acceptance_rate
+            "stratum_share_acceptance_avg_rate {acceptance_rate:.6}\n"
         ));
 
         prometheus_output.push_str(STRATUM_DIFFICULTY_ADJUSTMENTS_COUNTER_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_DIFFICULTY_ADJUSTMENTS_COUNTER_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_difficulty_adjustments_counter {}\n",
             global.difficulty_adjustments
         ));
 
         prometheus_output.push_str(STRATUM_SHARES_PER_MINUTE_GAUGE_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_SHARES_PER_MINUTE_GAUGE_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_shares_per_minute_gauge {}\n",
             global.shares_per_minute
         ));
 
         prometheus_output.push_str(STRATUM_STALE_SHARES_COUNTER_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_STALE_SHARES_COUNTER_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_stale_shares_counter {}\n",
             global.stale_shares
         ));
 
         prometheus_output.push_str(STRATUM_DUPLICATE_SHARES_COUNTER_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_DUPLICATE_SHARES_COUNTER_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_duplicate_shares_counter {}\n",
             global.duplicate_submissions
@@ -930,27 +929,27 @@ async fn get_prometheus_metrics() -> Result<String, StatusCode> {
 
         // Job distribution latency metrics with proper naming
         prometheus_output.push_str(STRATUM_JOB_DISTRIBUTION_LATENCY_AVG_MS_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_JOB_DISTRIBUTION_LATENCY_AVG_MS_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_job_distribution_latency_avg_ms {:.2}\n",
             global.avg_job_distribution_latency_ms
         ));
 
         prometheus_output.push_str(STRATUM_JOB_DISTRIBUTION_LATENCY_MAX_MS_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_JOB_DISTRIBUTION_LATENCY_MAX_MS_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_job_distribution_latency_max_ms {:.2}\n",
             global.max_job_distribution_latency_ms
         ));
 
         prometheus_output.push_str(STRATUM_JOB_DISTRIBUTION_LATENCY_MIN_MS_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_JOB_DISTRIBUTION_LATENCY_MIN_MS_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_job_distribution_latency_min_ms {:.2}\n",
             global.min_job_distribution_latency_ms
@@ -958,54 +957,54 @@ async fn get_prometheus_metrics() -> Result<String, StatusCode> {
 
         // Missing error metrics with proper _total suffix
         prometheus_output.push_str(STRATUM_TIMEOUT_ERRORS_TOTAL_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_TIMEOUT_ERRORS_TOTAL_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_timeout_errors_total {}\n",
             global.timeout_errors
         ));
 
         prometheus_output.push_str(STRATUM_PROTOCOL_PARSE_ERRORS_TOTAL_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_PROTOCOL_PARSE_ERRORS_TOTAL_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_protocol_parse_errors_total {}\n",
             global.protocol_parse_errors
         ));
 
         prometheus_output.push_str(STRATUM_VALIDATION_ERRORS_TOTAL_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_VALIDATION_ERRORS_TOTAL_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_validation_errors_total {}\n",
             global.validation_errors
         ));
 
         prometheus_output.push_str(STRATUM_SECURITY_VIOLATION_ERRORS_TOTAL_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_SECURITY_VIOLATION_ERRORS_TOTAL_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_security_violation_errors_total {}\n",
             global.security_violation_errors
         ));
 
         prometheus_output.push_str(STRATUM_RESOURCE_EXHAUSTION_ERRORS_TOTAL_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_RESOURCE_EXHAUSTION_ERRORS_TOTAL_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_resource_exhaustion_errors_total {}\n",
             global.resource_exhaustion_errors
         ));
 
         prometheus_output.push_str(STRATUM_INTERNAL_ERRORS_TOTAL_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_INTERNAL_ERRORS_TOTAL_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_internal_errors_total {}\n",
             global.internal_errors
@@ -1013,18 +1012,18 @@ async fn get_prometheus_metrics() -> Result<String, StatusCode> {
 
         // Additional resource utilization metrics
         prometheus_output.push_str(STRATUM_MEMORY_EFFICIENCY_RATIO_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_MEMORY_EFFICIENCY_RATIO_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_memory_efficiency_ratio {:.6}\n",
             global.memory_efficiency_ratio
         ));
 
         prometheus_output.push_str(STRATUM_RESOURCE_PRESSURE_EVENTS_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_RESOURCE_PRESSURE_EVENTS_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_resource_pressure_events {}\n",
             global.resource_pressure_events
@@ -1032,18 +1031,18 @@ async fn get_prometheus_metrics() -> Result<String, StatusCode> {
 
         // Missing protocol detection metrics
         prometheus_output.push_str(STRATUM_HTTP_CONNECT_REQUESTS_ALT_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_HTTP_CONNECT_REQUESTS_ALT_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_http_connect_requests {}\n",
             global.http_connect_requests
         ));
 
         prometheus_output.push_str(STRATUM_DIRECT_STRATUM_CONNECTIONS_ALT_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_DIRECT_STRATUM_CONNECTIONS_ALT_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_direct_stratum_connections {}\n",
             global.direct_stratum_connections
@@ -1051,27 +1050,27 @@ async fn get_prometheus_metrics() -> Result<String, StatusCode> {
 
         // Basic protocol metrics needed by alert rules
         prometheus_output.push_str(STRATUM_MESSAGES_RECEIVED_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_MESSAGES_RECEIVED_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_messages_received {}\n",
             global.messages_received
         ));
 
         prometheus_output.push_str(STRATUM_SUBMISSIONS_RECEIVED_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_SUBMISSIONS_RECEIVED_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_submissions_received {}\n",
             global.submissions_received
         ));
 
         prometheus_output.push_str(STRATUM_SUBMISSIONS_ACCEPTED_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_SUBMISSIONS_ACCEPTED_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_submissions_accepted {}\n",
             global.submissions_accepted
@@ -1079,63 +1078,63 @@ async fn get_prometheus_metrics() -> Result<String, StatusCode> {
 
         // Authentication metrics
         prometheus_output.push_str(STRATUM_AUTH_SUCCESSES_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_AUTH_SUCCESSES_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_auth_successes {}\n",
             global.auth_successes
         ));
 
         prometheus_output.push_str(STRATUM_AUTH_FAILURES_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_AUTH_FAILURES_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!("stratum_auth_failures {}\n", global.auth_failures));
         prometheus_output.push_str(STRATUM_AUTH_ATTEMPTS_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_AUTH_ATTEMPTS_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!("stratum_auth_attempts {}\n", global.auth_attempts));
 
         prometheus_output.push_str(STRATUM_AUTH_SUCCESSES_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_AUTH_SUCCESSES_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_auth_successes {}\n",
             global.auth_successes
         ));
 
         prometheus_output.push_str(STRATUM_AUTH_FAILURES_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_AUTH_FAILURES_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!("stratum_auth_failures {}\n", global.auth_failures));
 
         // Legacy submission metrics (existing)
         prometheus_output.push_str(STRATUM_TOTAL_SUBMISSIONS_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_TOTAL_SUBMISSIONS_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_total_submissions {}\n",
             global.submissions_received
         ));
 
         prometheus_output.push_str(STRATUM_ACCEPTED_SUBMISSIONS_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_ACCEPTED_SUBMISSIONS_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_accepted_submissions {}\n",
             global.submissions_accepted
         ));
 
         prometheus_output.push_str(STRATUM_REJECTED_SUBMISSIONS_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_REJECTED_SUBMISSIONS_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_rejected_submissions {}\n",
             global.submissions_rejected
@@ -1143,18 +1142,18 @@ async fn get_prometheus_metrics() -> Result<String, StatusCode> {
 
         // Legacy security metrics (existing)
         prometheus_output.push_str(STRATUM_SECURITY_VIOLATIONS_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_SECURITY_VIOLATIONS_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_security_violations {}\n",
             global.security_violations
         ));
 
         prometheus_output.push_str(STRATUM_RATE_LIMIT_HITS_HELP);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(STRATUM_RATE_LIMIT_HITS_TYPE);
-        prometheus_output.push_str("\n");
+        prometheus_output.push('\n');
         prometheus_output.push_str(&format!(
             "stratum_rate_limit_hits {}\n",
             global.rate_limit_hits
@@ -1164,33 +1163,33 @@ async fn get_prometheus_metrics() -> Result<String, StatusCode> {
         let users = stratum_metrics.get_all_user_metrics();
         if !users.is_empty() {
             prometheus_output.push_str(STRATUM_USER_TOTAL_SUBMISSIONS_HELP);
-            prometheus_output.push_str("\n");
+            prometheus_output.push('\n');
             prometheus_output.push_str(STRATUM_USER_TOTAL_SUBMISSIONS_TYPE);
-            prometheus_output.push_str("\n");
+            prometheus_output.push('\n');
             prometheus_output.push_str(STRATUM_USER_ACCEPTED_SUBMISSIONS_HELP);
-            prometheus_output.push_str("\n");
+            prometheus_output.push('\n');
             prometheus_output.push_str(STRATUM_USER_ACCEPTED_SUBMISSIONS_TYPE);
-            prometheus_output.push_str("\n");
+            prometheus_output.push('\n');
             prometheus_output.push_str(STRATUM_USER_REJECTED_SUBMISSIONS_HELP);
-            prometheus_output.push_str("\n");
+            prometheus_output.push('\n');
             prometheus_output.push_str(STRATUM_USER_REJECTED_SUBMISSIONS_TYPE);
-            prometheus_output.push_str("\n");
+            prometheus_output.push('\n');
             prometheus_output.push_str(STRATUM_USER_HASHRATE_HELP);
-            prometheus_output.push_str("\n");
+            prometheus_output.push('\n');
             prometheus_output.push_str(STRATUM_USER_HASHRATE_TYPE);
-            prometheus_output.push_str("\n");
+            prometheus_output.push('\n');
             prometheus_output.push_str(STRATUM_USER_CONNECTIONS_HELP);
-            prometheus_output.push_str("\n");
+            prometheus_output.push('\n');
             prometheus_output.push_str(STRATUM_USER_CONNECTIONS_TYPE);
-            prometheus_output.push_str("\n");
+            prometheus_output.push('\n');
             prometheus_output.push_str(STRATUM_USER_MESSAGES_RECEIVED_HELP);
-            prometheus_output.push_str("\n");
+            prometheus_output.push('\n');
             prometheus_output.push_str(STRATUM_USER_MESSAGES_RECEIVED_TYPE);
-            prometheus_output.push_str("\n");
+            prometheus_output.push('\n');
             prometheus_output.push_str(STRATUM_USER_MESSAGES_SENT_HELP);
-            prometheus_output.push_str("\n");
+            prometheus_output.push('\n');
             prometheus_output.push_str(STRATUM_USER_MESSAGES_SENT_TYPE);
-            prometheus_output.push_str("\n");
+            prometheus_output.push('\n');
 
             for user in users.iter().take(100) {
                 // Limit to 100 users to avoid huge responses

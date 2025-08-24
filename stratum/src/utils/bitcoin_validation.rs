@@ -146,9 +146,7 @@ impl BitcoinAddressValidator {
             }
         } else if address.starts_with("bc1p") {
             Some(BitcoinAddressType::P2TR)
-        } else if address.starts_with('m') || address.starts_with('n') || address.starts_with('2') {
-            Some(BitcoinAddressType::Testnet)
-        } else if address.starts_with("tb1") {
+        } else if address.starts_with('m') || address.starts_with('n') || address.starts_with('2') || address.starts_with("tb1") {
             Some(BitcoinAddressType::Testnet)
         } else {
             None

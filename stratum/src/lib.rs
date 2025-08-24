@@ -18,23 +18,22 @@
 //!
 //! ## Quick Start
 //!
-//! ```rust
-//! use loka_stratum::{Config, Listener, Manager};
+//! ```rust,no_run
+//! use loka_stratum::{Config, Listener};
+//! use loka_stratum::services::database::DatabaseService;
 //! use std::sync::Arc;
 //!
 //! #[tokio::main]
-//! async fn main() -> loka_stratum::Result<()> {
-//!     // Load configuration
-//!     let config = Config::load().await?;
-//!     let config = Arc::new(config);
+//! async fn main() -> anyhow::Result<()> {
+//!     // Initialize database service
+//!     let database = Arc::new(DatabaseService::new("sqlite::memory:").await?);
 //!
-//!     // Initialize manager
-//!     let manager = Manager::new(config.clone()).await?;
-//!     let manager = Arc::new(manager);
+//!     // Load configuration from database
+//!     let config = Config::load(&database).await?;
 //!
-//!     // Start listener
-//!     let listener = Listener::new(manager, config);
-//!     listener.run().await?;
+//!     // Start listener (creates manager internally)
+//!     let listener = Listener::new(config).await?;
+//!     listener.accept().await?;
 //!
 //!     Ok(())
 //! }

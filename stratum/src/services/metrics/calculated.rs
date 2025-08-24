@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 /// use loka_stratum::services::metrics::{CalculatedMetrics, MetricsSnapshot};
 ///
 /// let snapshot = MetricsSnapshot::default();
-/// let calculated = snapshot.calculated_metrics();
+/// let calculated = snapshot.calculate_metrics();
 ///
 /// println!("Connection success rate: {:.2}%", calculated.connection_success_rate * 100.0);
 /// println!("Auth success rate: {:.2}%", calculated.auth_success_rate * 100.0);

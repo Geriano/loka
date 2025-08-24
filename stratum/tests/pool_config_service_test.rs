@@ -28,7 +28,7 @@ async fn test_pool_config_service() {
             Arc::new(db)
         }
         Err(e) => {
-            eprintln!("❌ Skipping test - could not connect to database: {}", e);
+            eprintln!("❌ Skipping test - could not connect to database: {e}");
             return;
         }
     };
@@ -49,7 +49,7 @@ async fn test_pool_config_service() {
     let test_pool = PoolConfig {
         id: Uuid::new_v4(),
         address: "pool.example.com:4444".to_string(),
-        name: format!("test_service_pool_{}", timestamp),
+        name: format!("test_service_pool_{timestamp}"),
         username: "test_service_user".to_string(),
         password: Some("secure_password".to_string()),
         separator: (",".to_string(), "-".to_string()),
@@ -60,7 +60,7 @@ async fn test_pool_config_service() {
         .create_pool_config(&test_pool)
         .await
         .expect("Failed to create test pool");
-    println!("✅ Test pool created with ID: {}", created_pool_id);
+    println!("✅ Test pool created with ID: {created_pool_id}");
 
     // Test 2: Get pool configuration through service (should populate cache)
     let retrieved_pool = pool_service
@@ -75,7 +75,7 @@ async fn test_pool_config_service() {
     );
     assert_eq!(
         retrieved_pool.name,
-        format!("test_service_pool_{}", timestamp)
+        format!("test_service_pool_{timestamp}")
     );
     assert_eq!(retrieved_pool.address, "pool.example.com:4444");
 
@@ -87,11 +87,11 @@ async fn test_pool_config_service() {
         .expect("Cached pool config not found");
 
     println!("✅ Pool retrieved from cache: {}", cached_pool.name);
-    assert_eq!(cached_pool.name, format!("test_service_pool_{}", timestamp));
+    assert_eq!(cached_pool.name, format!("test_service_pool_{timestamp}"));
 
     // Test 4: Get pool by name
     let pool_by_name = pool_service
-        .get_pool_config_by_name(&format!("test_service_pool_{}", timestamp))
+        .get_pool_config_by_name(&format!("test_service_pool_{timestamp}"))
         .await
         .expect("Failed to get pool by name")
         .expect("Pool not found by name");
@@ -119,7 +119,7 @@ async fn test_pool_config_service() {
 
     // Test 7: Check cache statistics
     let stats = pool_service.get_cache_stats();
-    println!("✅ Cache stats: {}", stats);
+    println!("✅ Cache stats: {stats}");
     assert!(stats.cached_pools > 0);
 
     // Test 8: Invalidate specific pool cache
@@ -129,7 +129,7 @@ async fn test_pool_config_service() {
     // Test 9: Update pool configuration
     let mut updated_pool = test_pool.clone();
     updated_pool.id = created_pool_id;
-    updated_pool.name = format!("updated_service_pool_{}", timestamp);
+    updated_pool.name = format!("updated_service_pool_{timestamp}");
     updated_pool.username = "updated_user".to_string();
 
     // Test 11: Start background refresh and test hot-reload
@@ -172,13 +172,13 @@ async fn test_pool_config_cache_expiry() {
     println!("Starting pool configuration cache expiry test...");
 
     // Initialize database service
-    let database_service = match DatabaseService::new(&database_url).await {
+    let database_service = match DatabaseService::new(database_url).await {
         Ok(db) => {
             db.migrate().await.expect("Failed to migrate database");
             Arc::new(db)
         }
         Err(e) => {
-            eprintln!("❌ Skipping test - could not connect to database: {}", e);
+            eprintln!("❌ Skipping test - could not connect to database: {e}");
             return;
         }
     };
@@ -203,8 +203,8 @@ async fn test_pool_config_cache_expiry() {
     // Create a test pool
     let test_pool = PoolConfig {
         id: Uuid::new_v4(),
-        address: format!("{}:4444", host),
-        name: format!("cache_expiry_test_pool_{}", n),
+        address: format!("{host}:4444"),
+        name: format!("cache_expiry_test_pool_{n}"),
         username: "cache_test_user".to_string(),
         password: Some("cache_password".to_string()),
         separator: (".".to_string(), "_".to_string()),
@@ -215,7 +215,7 @@ async fn test_pool_config_cache_expiry() {
         .create_pool_config(&test_pool)
         .await
         .expect("Failed to create cache test pool");
-    println!("✅ Cache test pool created with ID: {}", created_pool_id);
+    println!("✅ Cache test pool created with ID: {created_pool_id}");
 
     // Get pool to populate cache
     let _pool1 = pool_service

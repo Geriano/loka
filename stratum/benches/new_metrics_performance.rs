@@ -238,15 +238,13 @@ fn bench_mining_operation_metrics(c: &mut Criterion) {
                 metrics
                     .share_acceptance_rate_count
                     .fetch_add(1, Ordering::Relaxed);
+            } else if black_box(false) {
+                // is stale
+                metrics.stale_shares_counter.fetch_add(1, Ordering::Relaxed);
             } else {
-                if black_box(false) {
-                    // is stale
-                    metrics.stale_shares_counter.fetch_add(1, Ordering::Relaxed);
-                } else {
-                    metrics
-                        .duplicate_shares_counter
-                        .fetch_add(1, Ordering::Relaxed);
-                }
+                metrics
+                    .duplicate_shares_counter
+                    .fetch_add(1, Ordering::Relaxed);
             }
 
             metrics
@@ -643,7 +641,7 @@ fn bench_atomic_bit_operations(c: &mut Criterion) {
 
     c.bench_function("float_to_bits_conversion", |b| {
         b.iter(|| {
-            let value = black_box(3.14159_f64);
+            let value = black_box(std::f64::consts::PI);
             let bits = value.to_bits();
             metrics
                 .avg_response_time_ms_bits
