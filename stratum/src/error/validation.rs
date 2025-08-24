@@ -219,17 +219,20 @@ impl StratumProtocolValidator {
         // REMOVED: All business validation logic removed to ensure transparent forwarding
         // The proxy now forwards ALL messages to the upstream pool regardless of content validity
         // Pool validation errors are relayed unchanged to miners
-        
+
         // Previous validation logic included:
         // - mining.authorize parameter validation (now forwarded to pool)
-        // - mining.submit parameter validation (now handled by pool)  
+        // - mining.submit parameter validation (now handled by pool)
         // - mining.subscribe parameter validation (now handled by pool)
         // - Username format validation (now handled by pool)
         // - Hex string validation (now handled by pool)
-        
+
         // Log method for debugging but don't validate
-        debug!(method = method, "Processing method without validation (transparent mode)");
-        
+        debug!(
+            method = method,
+            "Processing method without validation (transparent mode)"
+        );
+
         // Pass through all methods without validation
         Ok(())
     }
@@ -584,11 +587,6 @@ mod tests {
         });
 
         // Should pass since we're in transparent forwarding mode
-        assert!(
-            validator
-                .validate(&invalid_message, &context)
-                .await
-                .is_ok()
-        );
+        assert!(validator.validate(&invalid_message, &context).await.is_ok());
     }
 }

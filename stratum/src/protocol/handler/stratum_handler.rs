@@ -4,14 +4,14 @@
 //! messages including authentication, job distribution, share submission, and
 //! difficulty adjustments.
 
-use std::net::SocketAddr;
 use serde_json::Value;
+use std::net::SocketAddr;
 use tracing::{debug, info, warn};
 
-use crate::Manager;
-use crate::error::Result;  
-use crate::protocol::messages::StratumMessage;
 use crate::Config;
+use crate::Manager;
+use crate::error::Result;
+use crate::protocol::messages::StratumMessage;
 
 /// Stratum V1 protocol handler for mining operations.
 ///
@@ -80,18 +80,33 @@ impl StratumHandler {
         // Apply parameter normalization and prepare for forwarding
         // NO mock responses - everything is forwarded to real pool
         match message {
-            StratumMessage::Subscribe { id: _, user_agent: _ } => {
-                self.normalize_mining_subscribe(raw_message, manager, addr).await
+            StratumMessage::Subscribe {
+                id: _,
+                user_agent: _,
+            } => {
+                self.normalize_mining_subscribe(raw_message, manager, addr)
+                    .await
             }
-            StratumMessage::Authenticate { id: _, user: _, worker: _, password: _ } => {
-                self.prepare_mining_authorize_forwarding(raw_message, manager, addr, context).await  
+            StratumMessage::Authenticate {
+                id: _,
+                user: _,
+                worker: _,
+                password: _,
+            } => {
+                self.prepare_mining_authorize_forwarding(raw_message, manager, addr, context)
+                    .await
             }
             StratumMessage::Submit { id: _, job_id: _ } => {
-                self.prepare_mining_submit_forwarding(raw_message, manager, addr).await
+                self.prepare_mining_submit_forwarding(raw_message, manager, addr)
+                    .await
             }
             _ => {
                 // For other message types, forward as-is
-                debug!("miner {} - Forwarding message as-is: {}", addr, message.message_type());
+                debug!(
+                    "miner {} - Forwarding message as-is: {}",
+                    addr,
+                    message.message_type()
+                );
                 Ok(self.parse_raw_json(raw_message))
             }
         }
@@ -107,7 +122,10 @@ impl StratumHandler {
         manager: &Manager,
         addr: SocketAddr,
     ) -> Result<Option<Value>> {
-        info!("miner {} - Normalizing mining.subscribe for forwarding", addr);
+        info!(
+            "miner {} - Normalizing mining.subscribe for forwarding",
+            addr
+        );
 
         // Parse the original message
         match self.parse_raw_json(raw_message) {
@@ -131,8 +149,11 @@ impl StratumHandler {
 
                 // Record protocol detection success
                 manager.metrics().record_protocol_detection_success_event();
-                
-                debug!("miner {} - Mining.subscribe normalized for pool forwarding", addr);
+
+                debug!(
+                    "miner {} - Mining.subscribe normalized for pool forwarding",
+                    addr
+                );
                 Ok(Some(json_value))
             }
             None => {
@@ -155,7 +176,10 @@ impl StratumHandler {
         addr: SocketAddr,
         context: Option<&crate::protocol::pipeline::MessageContext>,
     ) -> Result<Option<Value>> {
-        info!("miner {} - Preparing mining.authorize for pool forwarding", addr);
+        info!(
+            "miner {} - Preparing mining.authorize for pool forwarding",
+            addr
+        );
 
         // Parse the original message to extract username for metrics
         if let Some(mut json_value) = self.parse_raw_json(raw_message) {
@@ -168,10 +192,11 @@ impl StratumHandler {
                 if let Some(params) = obj.get_mut("params") {
                     if let Some(params_array) = params.as_array_mut() {
                         // Extract original username first
-                        let original_username = params_array.first()
+                        let original_username = params_array
+                            .first()
                             .and_then(|v| v.as_str())
                             .map(|s| s.to_string());
-                        
+
                         if let Some(ref pool_user) = pool_username {
                             if let Some(ref orig_user) = original_username {
                                 // Replace original username with pool format
@@ -182,7 +207,10 @@ impl StratumHandler {
                                 );
                             }
                         } else if let Some(ref orig_user) = original_username {
-                            debug!("miner {} - Forwarding authorize for user: {}", addr, orig_user);
+                            debug!(
+                                "miner {} - Forwarding authorize for user: {}",
+                                addr, orig_user
+                            );
                         }
                     }
                 }
@@ -190,8 +218,11 @@ impl StratumHandler {
 
             // Record that we're attempting authentication (real result will come from pool)
             manager.metrics().record_auth_attempt(true); // We don't know the result yet
-            
-            debug!("miner {} - Mining.authorize prepared for pool forwarding", addr);
+
+            debug!(
+                "miner {} - Mining.authorize prepared for pool forwarding",
+                addr
+            );
             Ok(Some(json_value))
         } else {
             warn!("miner {} - Failed to parse mining.authorize message", addr);
@@ -211,7 +242,10 @@ impl StratumHandler {
         manager: &Manager,
         addr: SocketAddr,
     ) -> Result<Option<Value>> {
-        info!("miner {} - Preparing mining.submit for pool forwarding", addr);
+        info!(
+            "miner {} - Preparing mining.submit for pool forwarding",
+            addr
+        );
 
         // Parse the original message to extract job_id and other details for metrics
         if let Some(json_value) = self.parse_raw_json(raw_message) {
@@ -231,8 +265,11 @@ impl StratumHandler {
             // Record the submission attempt (real result will come from pool)
             manager.metrics().record_share_submission_event();
             manager.metrics().record_submission_received();
-            
-            debug!("miner {} - Mining.submit prepared for pool forwarding", addr);
+
+            debug!(
+                "miner {} - Mining.submit prepared for pool forwarding",
+                addr
+            );
             Ok(Some(json_value))
         } else {
             warn!("miner {} - Failed to parse mining.submit message", addr);
@@ -241,7 +278,6 @@ impl StratumHandler {
         }
     }
 
-
     /// Parse raw JSON message for forwarding.
     ///
     /// Helper method to parse raw JSON messages while preserving structure
@@ -249,7 +285,6 @@ impl StratumHandler {
     fn parse_raw_json(&self, raw_message: &str) -> Option<Value> {
         serde_json::from_str::<Value>(raw_message.trim()).ok()
     }
-
 }
 
 impl Default for StratumHandler {

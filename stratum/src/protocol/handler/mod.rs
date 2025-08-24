@@ -29,9 +29,9 @@
 //! ```
 
 pub mod http_handler;
-pub mod stratum_handler;  
 pub mod message_processor;
 pub mod state_manager;
+pub mod stratum_handler;
 
 // Re-export the main ProtocolHandler for backward compatibility
 pub use state_manager::ProtocolHandler;

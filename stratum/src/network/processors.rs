@@ -18,8 +18,7 @@ pub struct LoggingProcessor {
     log_level: LogLevel,
 }
 
-#[derive(Debug, Clone, Copy)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, Default)]
 pub enum LogLevel {
     Trace,
     #[default]
@@ -29,7 +28,6 @@ pub enum LogLevel {
     Error,
     Off,
 }
-
 
 impl LoggingProcessor {
     pub fn new(log_level: LogLevel) -> Self {

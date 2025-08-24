@@ -115,7 +115,7 @@ impl Manager {
         let atomic_metrics = Arc::new(AtomicMetrics::new());
         let metrics = Arc::new(
             MetricsService::with_config(atomic_metrics, metrics_config)
-                .with_database_service(database.clone())
+                .with_database_service(database.clone()),
         );
 
         Ok(Self {

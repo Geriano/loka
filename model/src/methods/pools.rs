@@ -8,24 +8,30 @@ use sea_orm::prelude::*;
 use crate::entities::pools;
 use crate::{Error, Result, ValidationError};
 
+/// Parameters for creating a new pool
+#[derive(Debug)]
+pub struct CreatePoolParams<'a> {
+    pub name: &'a str,
+    pub bind: u16,
+    pub host: Ipv4Addr,
+    pub port: u16,
+    pub username: &'a str,
+    pub password: Option<&'a str>,
+    pub sep1: &'a str,
+    pub sep2: &'a str,
+    pub settlement: NaiveTime,
+    pub offsets: Option<u16>,
+    pub difficulty: Option<f32>,
+}
+
 impl pools::Model {
-    #[tracing::instrument(skip(db))]
+    #[tracing::instrument(skip(db, params))]
     pub async fn store(
         db: &impl ConnectionTrait,
-        name: &str,
-        bind: u16,
-        host: Ipv4Addr,
-        port: u16,
-        username: &str,
-        password: Option<&str>,
-        sep1: &str,
-        sep2: &str,
-        settlement: NaiveTime,
-        offsets: Option<u16>,
-        difficulty: Option<f32>,
+        params: CreatePoolParams<'_>,
     ) -> Result<pools::Model> {
         let mut errors = Vec::new();
-        let name = name.trim().to_lowercase();
+        let name = params.name.trim().to_lowercase();
 
         if name.is_empty() {
             errors.push(ValidationError {
@@ -38,7 +44,7 @@ impl pools::Model {
             .filter(
                 Condition::any()
                     .add(pools::Column::Name.eq(&name))
-                    .add(pools::Column::Bind.eq(bind as i16)),
+                    .add(pools::Column::Bind.eq(params.bind as i16)),
             )
             .one(db)
             .await;
@@ -63,16 +69,16 @@ impl pools::Model {
         let model = pools::Model {
             id: Uuid::new_v4(),
             name,
-            bind: bind as i16,
-            host: host.to_string(),
-            port: port as i16,
-            username: username.to_string(),
-            password: password.map(|p| p.to_string()),
-            sep1: sep1.to_string(),
-            sep2: sep2.to_string(),
-            offsets: offsets.unwrap_or(0) as i16,
-            difficulty: difficulty.unwrap_or(0.0),
-            settlement,
+            bind: params.bind as i16,
+            host: params.host.to_string(),
+            port: params.port as i16,
+            username: params.username.to_string(),
+            password: params.password.map(|p| p.to_string()),
+            sep1: params.sep1.to_string(),
+            sep2: params.sep2.to_string(),
+            offsets: params.offsets.unwrap_or(0) as i16,
+            difficulty: params.difficulty.unwrap_or(0.0),
+            settlement: params.settlement,
             active: true,
         };
 

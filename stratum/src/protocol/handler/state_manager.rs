@@ -26,8 +26,8 @@ use crate::services::pool_config::{PoolConfigService, PoolConfigServiceConfig};
 use crate::{Config, auth};
 
 use super::http_handler::HttpHandler;
-use super::stratum_handler::StratumHandler;
 use super::message_processor::MessageProcessor;
+use super::stratum_handler::StratumHandler;
 
 /// Main protocol handler that coordinates connection lifecycle and message routing.
 ///
@@ -114,7 +114,7 @@ impl ProtocolHandler {
         // Create specialized handlers
         let http_handler = HttpHandler::new(Arc::new(pool_service.clone()));
         let stratum_handler = StratumHandler::new();
-        
+
         // Create message processor that coordinates between handlers
         let message_processor = MessageProcessor::new(
             pipeline.clone(),
@@ -126,8 +126,7 @@ impl ProtocolHandler {
         if let Some(ref path) = connection_path {
             info!(
                 "miner {} - Handler created with connection path: {}",
-                addr,
-                path
+                addr, path
             );
         }
 
@@ -217,19 +216,19 @@ impl ProtocolHandler {
 
         // Handle results and log any errors
         match downstream_result {
-            Ok(Ok(())) => {},
+            Ok(Ok(())) => {}
             Ok(Err(e)) => error!("miner {} - Downstream handler error: {}", self.addr, e),
             Err(e) => error!("miner {} - Downstream join error: {}", self.addr, e),
         }
 
         match upstream_result {
-            Ok(Ok(())) => {},
+            Ok(Ok(())) => {}
             Ok(Err(e)) => error!("miner {} - Upstream handler error: {}", self.addr, e),
             Err(e) => error!("miner {} - Upstream join error: {}", self.addr, e),
         }
 
         match coordinator_result {
-            Ok(Ok(())) => {},
+            Ok(Ok(())) => {}
             Ok(Err(e)) => error!("miner {} - Proxy coordinator error: {}", self.addr, e),
             Err(e) => error!("miner {} - Coordinator join error: {}", self.addr, e),
         }
@@ -241,11 +240,14 @@ impl ProtocolHandler {
     /// Connect to the upstream mining pool.
     async fn connect_to_upstream(&self) -> Result<TcpStream> {
         let pool_address = &self.config.pool.address; // Already in host:port format
-        info!("miner {} - Connecting to upstream pool: {}", self.addr, pool_address);
+        info!(
+            "miner {} - Connecting to upstream pool: {}",
+            self.addr, pool_address
+        );
 
         let stream = TcpStream::connect(pool_address).await?;
         debug!("miner {} - Connected to upstream pool", self.addr);
-        
+
         Ok(stream)
     }
 
@@ -340,7 +342,10 @@ impl ProtocolHandler {
                             // Parse and forward to client
                             if let Ok(json_value) = serde_json::from_str(raw_message) {
                                 if let Err(e) = upstream_to_downstream_tx.send(json_value) {
-                                    warn!("miner {} - Failed to forward upstream message: {}", addr, e);
+                                    warn!(
+                                        "miner {} - Failed to forward upstream message: {}",
+                                        addr, e
+                                    );
                                     break;
                                 }
                             }
@@ -430,23 +435,23 @@ impl ProtocolHandler {
     pub fn update_metrics(&self) {
         // Update connection-specific metrics
         self.manager.metrics().update_resource_utilization(0.0, 0.0); // Would get real values
-        
+
         // Update connection duration, etc.
     }
 
     /// Handle connection cleanup when the connection ends.
     pub async fn cleanup(&self) {
         info!("miner {} - Cleaning up connection resources", self.addr);
-        
+
         // Clean up authentication state
         if let Some(_auth_state) = self.auth() {
             // Remove from manager's auth tracking
             self.manager.auth().terminated(&self.addr);
         }
-        
+
         // Update metrics
         self.manager.metrics().record_disconnection();
-        
+
         // Log connection statistics
         debug!(
             "miner {} - Connection completed, path: {:?}",
@@ -468,15 +473,19 @@ impl ProtocolHandler {
     /// # Returns
     ///
     /// Result indicating success or failure of the connection handling
-    pub async fn run(&self, downstream: tokio::net::TcpStream, upstream: tokio::net::TcpStream) -> crate::error::Result<()> {
+    pub async fn run(
+        &self,
+        downstream: tokio::net::TcpStream,
+        upstream: tokio::net::TcpStream,
+    ) -> crate::error::Result<()> {
         info!("miner {} - Starting protocol handler", self.addr);
-        
+
         // Set up the connection
         self.manager.connection_established(&self.addr);
-        
+
         let (downstream_read, downstream_write) = downstream.into_split();
         let (upstream_read, upstream_write) = upstream.into_split();
-        
+
         // Create buffered readers/writers
         let mut downstream_reader = tokio::io::BufReader::new(downstream_read);
         let mut upstream_reader = tokio::io::BufReader::new(upstream_read);
@@ -497,15 +506,15 @@ impl ProtocolHandler {
                         }
                         Ok(_) => {
                             let trimmed_message = downstream_line.trim();
-                            
+
                             // Handle HTTP CONNECT requests locally instead of forwarding them
                             if trimmed_message.starts_with("CONNECT ") {
                                 info!("miner {} - Handling HTTP CONNECT request locally", self.addr);
-                                
+
                                 // Extract CONNECT target
                                 if let Some(target) = HttpHandler::parse_connect_target_from_message(trimmed_message) {
                                     debug!("miner {} - CONNECT target: {}", self.addr, target);
-                                    
+
                                     // Send HTTP 200 Connection Established response to client
                                     let connect_response = "HTTP/1.1 200 Connection established\r\n\r\n";
                                     if let Err(e) = downstream_writer.write_all(connect_response.as_bytes()).await {
@@ -516,9 +525,9 @@ impl ProtocolHandler {
                                         warn!("miner {} - Failed to flush CONNECT response: {}", self.addr, e);
                                         break;
                                     }
-                                    
+
                                     info!("miner {} - Sent HTTP 200 Connection Established", self.addr);
-                                    
+
                                     // Now we're in tunnel mode - continue to next message
                                     downstream_line.clear();
                                     continue;
@@ -535,9 +544,9 @@ impl ProtocolHandler {
                                     break;
                                 }
                             }
-                            
+
                             // Skip other HTTP headers during CONNECT handshake
-                            if trimmed_message.starts_with("Host: ") || 
+                            if trimmed_message.starts_with("Host: ") ||
                                trimmed_message.starts_with("Proxy-Connection: ") ||
                                trimmed_message.starts_with("Connection: ") ||
                                trimmed_message.is_empty() {
@@ -545,7 +554,7 @@ impl ProtocolHandler {
                                 downstream_line.clear();
                                 continue;
                             }
-                            
+
                             // Process message for normalization and metrics only
                             // NO local responses - everything is forwarded to real pool
                             let message_to_forward = match self.message_processor.process_message(&downstream_line, &self.manager, &self.config, self.addr).await {
@@ -562,7 +571,7 @@ impl ProtocolHandler {
                                     downstream_line.clone()
                                 }
                             };
-                            
+
                             // Forward processed message to upstream pool
                             if let Err(e) = upstream_writer.write_all(message_to_forward.as_bytes()).await {
                                 warn!("miner {} - Failed to forward to upstream: {}", self.addr, e);
@@ -572,11 +581,11 @@ impl ProtocolHandler {
                                 warn!("miner {} - Failed to flush upstream: {}", self.addr, e);
                                 break;
                             }
-                            
+
                             trace!("miner {} - Forwarded to pool: {}", self.addr, message_to_forward.trim());
                             self.manager.metrics().record_messages_sent(1);
                             self.manager.metrics().record_bytes_sent(message_to_forward.len() as u64);
-                            
+
                             downstream_line.clear();
                         }
                         Err(e) => {
@@ -585,7 +594,7 @@ impl ProtocolHandler {
                         }
                     }
                 }
-                
+
                 // Handle upstream messages (from pool)
                 result = upstream_reader.read_line(&mut upstream_line) => {
                     match result {
@@ -603,11 +612,11 @@ impl ProtocolHandler {
                                 warn!("miner {} - Failed to flush client: {}", self.addr, e);
                                 break;
                             }
-                            
+
                             debug!("miner {} - Forwarded upstream message to client: {}", self.addr, upstream_line.trim());
                             self.manager.metrics().record_messages_sent(1);
                             self.manager.metrics().record_bytes_sent(upstream_line.len() as u64);
-                            
+
                             upstream_line.clear();
                         }
                         Err(e) => {
@@ -616,7 +625,7 @@ impl ProtocolHandler {
                         }
                     }
                 }
-                
+
                 // Handle shutdown signal
                 _ = tokio::time::sleep(tokio::time::Duration::from_millis(100)) => {
                     if self.terminated() {
@@ -637,7 +646,7 @@ impl ProtocolHandler {
 // Note: Some methods from the original ProtocolHandler would be moved here
 // and integrated with the new modular structure. This includes methods like:
 // - extract_path_from_message (moved to HttpHandler)
-// - handle_parsed_message (moved to StratumHandler) 
+// - handle_parsed_message (moved to StratumHandler)
 // - is_direct_http_request (moved to HttpHandler)
 // - etc.
 

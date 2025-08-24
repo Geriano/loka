@@ -231,7 +231,14 @@ impl MessageProcessor {
             // Route to Stratum handler and return response
             return self
                 .stratum_handler
-                .handle_parsed_message(stratum_message, message, manager, config, addr, Some(&processed_context))
+                .handle_parsed_message(
+                    stratum_message,
+                    message,
+                    manager,
+                    config,
+                    addr,
+                    Some(&processed_context),
+                )
                 .await;
         } else {
             // Try manual parsing as fallback
@@ -239,7 +246,14 @@ impl MessageProcessor {
                 Ok(parsed_message) => {
                     return self
                         .stratum_handler
-                        .handle_parsed_message(&parsed_message, message, manager, config, addr, None)
+                        .handle_parsed_message(
+                            &parsed_message,
+                            message,
+                            manager,
+                            config,
+                            addr,
+                            None,
+                        )
                         .await;
                 }
                 Err(e) => {

@@ -68,7 +68,6 @@ pub mod utils;
 /// Command-line interface for the stratum proxy
 pub mod cli;
 
-
 // === CORE MODULES ===
 
 /// Authentication and authorization management

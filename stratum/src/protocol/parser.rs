@@ -30,7 +30,8 @@ impl StratumParser {
     fn handle_subscribe(&self, request: Request) -> Result<StratumMessage> {
         let user_agent = if let Some(params) = request.params {
             if let Some(params) = params.as_array() {
-                params.first()
+                params
+                    .first()
                     .and_then(|param| param.as_str())
                     .map(|s| s.to_string())
             } else {
