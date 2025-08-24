@@ -1,53 +1,209 @@
-name: Build loka-stratum
+name: Release Management
 
 on:
   push:
-    tags:
-      - 'v*'
+    tags: ['v*']
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., v0.1.0)'
+        required: true
+        type: string
+      prerelease:
+        description: 'Mark as pre-release'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  CARGO_TERM_COLOR: always
 
 jobs:
-  build:
-    name: Build
+  # Job 1: Validate Release
+  validate-release:
+    name: Validate Release
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      is-prerelease: ${{ steps.version.outputs.is-prerelease }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract version information
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+            IS_PRERELEASE="${{ github.event.inputs.prerelease }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/}"
+            IS_PRERELEASE="false"
+            if [[ "$VERSION" =~ (alpha|beta|rc) ]]; then
+              IS_PRERELEASE="true"
+            fi
+          fi
+          
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "is-prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT
+          
+          echo "Release version: $VERSION"
+          echo "Is prerelease: $IS_PRERELEASE"
+
+      - name: Validate version format
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+)?$ ]]; then
+            echo "❌ Invalid version format: $VERSION"
+            echo "Expected format: v1.2.3 or v1.2.3-alpha1"
+            exit 1
+          fi
+          echo "✅ Version format is valid"
+
+  # Job 2: Build Multi-platform Release Artifacts
+  build-artifacts:
+    name: Build Release Artifacts
+    runs-on: ${{ matrix.os }}
+    needs: validate-release
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            platform: linux-amd64
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            platform: linux-arm64
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            platform: darwin-amd64
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            platform: darwin-arm64
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Rust
+      - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache Rust dependencies
-        uses: actions/cache@v3
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          targets: ${{ matrix.target }}
 
-      - name: Install dependencies
+      - name: Install cross-compilation tools
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
         run: |
           sudo apt-get update
-          sudo apt-get install -y pkg-config libssl-dev curl
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+          echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
 
-      - name: Build loka-stratum
-        run: |
-          cd stratum
-          cargo build --release
-
-      - name: List build outputs
-        run: |
-          echo "=== Build directory contents ==="
-          ls -la target/release/
-          echo "=== Binary details ==="
-          file target/release/loka-stratum
-
-      - name: Create release
-        uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
         with:
-          files: target/release/loka-stratum
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-release-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build release binaries
+        run: |
+          cargo build --release --target ${{ matrix.target }} --workspace
+
+      - name: Create release package
+        run: |
+          VERSION="${{ needs.validate-release.outputs.version }}"
+          PLATFORM="${{ matrix.platform }}"
+          
+          mkdir -p release
+          
+          # Copy binaries
+          cp target/${{ matrix.target }}/release/loka-stratum release/
+          cp target/${{ matrix.target }}/release/migration release/
+          
+          # Copy configuration and documentation
+          cp -r stratum/config release/
+          cp README.md release/
+          
+          # Create archive
+          tar -czf loka-stratum-${VERSION}-${PLATFORM}.tar.gz -C release .
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.platform }}
+          path: loka-stratum-*.tar.gz
+
+  # Job 3: Generate Changelog and Create Release
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [validate-release, build-artifacts]
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release-assets
+          find artifacts/ -name "*.tar.gz" | while read file; do
+            cp "$file" release-assets/
+          done
+          ls -la release-assets/
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          VERSION="${{ needs.validate-release.outputs.version }}"
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
+          
+          if [ -n "$PREVIOUS_TAG" ]; then
+            CHANGELOG=$(git log --pretty=format:"- %s (%h)" $PREVIOUS_TAG..HEAD)
+          else
+            CHANGELOG=$(git log --pretty=format:"- %s (%h)" HEAD)
+          fi
+          
+          cat > RELEASE_NOTES.md << EOF
+          ## Changes
+          $CHANGELOG
+          
+          ## Installation
+          
+          ### Docker (Recommended)
+          \`\`\`bash
+          docker pull ghcr.io/${{ github.repository }}/loka-stratum:$VERSION
+          \`\`\`
+          
+          ### Binary Download
+          \`\`\`bash
+          wget https://github.com/${{ github.repository }}/releases/download/$VERSION/loka-stratum-$VERSION-linux-amd64.tar.gz
+          tar -xzf loka-stratum-$VERSION-linux-amd64.tar.gz
+          \`\`\`
+          EOF
+          
+          echo "notes<<EOF" >> $GITHUB_OUTPUT
+          cat RELEASE_NOTES.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ needs.validate-release.outputs.version }}
+          name: Loka Stratum ${{ needs.validate-release.outputs.version }}
+          body: ${{ steps.changelog.outputs.notes }}
+          files: release-assets/*
           draft: false
-          prerelease: false
+          prerelease: ${{ needs.validate-release.outputs.is-prerelease == 'true' }}
           generate_release_notes: true

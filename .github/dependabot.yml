@@ -1,0 +1,174 @@
+version: 2
+updates:
+  # Rust dependencies
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "geriano"
+    assignees:
+      - "geriano"
+    commit-message:
+      prefix: "deps:"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "rust"
+    groups:
+      tokio-ecosystem:
+        patterns:
+          - "tokio*"
+          - "tower*"
+          - "hyper*"
+          - "axum*"
+        update-types:
+          - "minor"
+          - "patch"
+      database-ecosystem:
+        patterns:
+          - "sea-orm*"
+          - "sqlx*"
+          - "sea-query*"
+        update-types:
+          - "minor"
+          - "patch"
+      metrics-ecosystem:
+        patterns:
+          - "metrics*"
+          - "prometheus*"
+        update-types:
+          - "minor"
+          - "patch"
+      security-ecosystem:
+        patterns:
+          - "sentry*"
+          - "tracing*"
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      # Ignore major version updates for critical dependencies
+      - dependency-name: "tokio"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "sea-orm"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "axum"
+        update-types: ["version-update:semver-major"]
+
+  # Stratum crate dependencies  
+  - package-ecosystem: "cargo"
+    directory: "/stratum"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps(stratum):"
+    labels:
+      - "dependencies"
+      - "stratum"
+      - "rust"
+
+  # Model crate dependencies
+  - package-ecosystem: "cargo"
+    directory: "/model"
+    schedule:
+      interval: "weekly"
+      day: "wednesday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps(model):"
+    labels:
+      - "dependencies"
+      - "model"
+      - "database"
+      - "rust"
+
+  # Migration crate dependencies
+  - package-ecosystem: "cargo"
+    directory: "/migration"
+    schedule:
+      interval: "weekly"
+      day: "thursday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps(migration):"
+    labels:
+      - "dependencies"
+      - "migration"
+      - "database"
+      - "rust"
+
+  # Metrics utility dependencies
+  - package-ecosystem: "cargo"
+    directory: "/utils/metrics"
+    schedule:
+      interval: "weekly"
+      day: "friday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps(metrics):"
+    labels:
+      - "dependencies"
+      - "metrics"
+      - "utils"
+      - "rust"
+
+  # Docker base images
+  - package-ecosystem: "docker"
+    directory: "/stratum"
+    schedule:
+      interval: "weekly"
+      day: "saturday"
+      time: "09:00"
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "deps(docker):"
+    labels:
+      - "dependencies"
+      - "docker"
+    ignore:
+      # Pin to specific versions for stability
+      - dependency-name: "rust"
+        update-types: ["version-update:semver-major"]
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "sunday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci:"
+    labels:
+      - "dependencies"
+      - "github-actions"
+      - "ci"
+
+  # NPM dependencies (if any monitoring tools use Node.js)
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "10:00"
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "deps(npm):"
+    labels:
+      - "dependencies"
+      - "npm"
+    ignore:
+      # Ignore dev dependencies major updates
+      - dependency-type: "development"
+        update-types: ["version-update:semver-major"]

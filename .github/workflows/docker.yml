@@ -1,0 +1,380 @@
+name: Docker Build & Security
+
+on:
+  push:
+    branches: [master, main, develop]
+    paths:
+      - 'stratum/Dockerfile'
+      - 'stratum/docker-entrypoint.sh'
+      - 'stratum/docker-compose.yml'
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
+  pull_request:
+    branches: [master, main, develop]
+    paths:
+      - 'stratum/Dockerfile'
+      - 'stratum/docker-entrypoint.sh'
+      - 'stratum/docker-compose.yml'
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
+  schedule:
+    # Rebuild weekly to get latest base image security updates
+    - cron: '0 4 * * 1'
+
+env:
+  REGISTRY_GHCR: ghcr.io
+  REGISTRY_DOCKERHUB: docker.io
+
+jobs:
+  # Job 1: Multi-variant Docker Builds
+  docker-variants:
+    name: Build Docker Variants
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        variant:
+          - name: release
+            target: release
+            dockerfile: stratum/Dockerfile
+            platforms: linux/amd64,linux/arm64
+            tags-suffix: ""
+          - name: debug
+            target: debug
+            dockerfile: stratum/Dockerfile
+            platforms: linux/amd64
+            tags-suffix: -debug
+          - name: slim
+            target: slim
+            dockerfile: stratum/Dockerfile.slim
+            platforms: linux/amd64,linux/arm64
+            tags-suffix: -slim
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY_GHCR }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login to Docker Hub
+        if: github.event_name != 'pull_request' && secrets.DOCKERHUB_USERNAME
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY_DOCKERHUB }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ env.REGISTRY_GHCR }}/${{ github.repository }}/loka-stratum
+            ${{ secrets.DOCKERHUB_USERNAME && format('{0}/{1}/loka-stratum', env.REGISTRY_DOCKERHUB, secrets.DOCKERHUB_USERNAME) || '' }}
+          tags: |
+            type=ref,event=branch,suffix=${{ matrix.variant.tags-suffix }}
+            type=ref,event=pr,suffix=${{ matrix.variant.tags-suffix }}
+            type=semver,pattern={{version}},suffix=${{ matrix.variant.tags-suffix }}
+            type=semver,pattern={{major}}.{{minor}},suffix=${{ matrix.variant.tags-suffix }}
+            type=sha,prefix={{branch}}-,suffix=${{ matrix.variant.tags-suffix }}
+            type=raw,value=latest${{ matrix.variant.tags-suffix }},enable={{is_default_branch}}
+          flavor: |
+            latest=false
+
+      - name: Build Docker image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ${{ matrix.variant.dockerfile }}
+          target: ${{ matrix.variant.target }}
+          platforms: ${{ matrix.variant.platforms }}
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.variant.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.variant.name }}
+          build-args: |
+            BUILDKIT_INLINE_CACHE=1
+            BUILD_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
+            VCS_REF=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.revision'] }}
+            VERSION=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
+
+      - name: Test image functionality
+        if: matrix.variant.name == 'release'
+        run: |
+          # Pull the built image for testing
+          docker pull ${{ fromJSON(steps.meta.outputs.json).tags[0] }}
+          
+          # Test basic functionality
+          docker run --rm -d --name loka-test-${{ matrix.variant.name }} \
+            -p 3334:3333 -p 9094:9090 \
+            -e DATABASE_URL=postgres://test:test@localhost:5432/test \
+            ${{ fromJSON(steps.meta.outputs.json).tags[0] }}
+          
+          # Wait for startup
+          sleep 15
+          
+          # Test health endpoint
+          timeout 30 bash -c 'until curl -f http://localhost:9094/health; do sleep 2; done'
+          
+          # Test metrics endpoint
+          curl -f http://localhost:9094/metrics/prometheus | head -20
+          
+          # Test that the application is actually listening on the stratum port
+          timeout 10 bash -c 'until nc -z localhost 3334; do sleep 1; done'
+          
+          # Cleanup
+          docker stop loka-test-${{ matrix.variant.name }}
+
+  # Job 2: Container Security Scanning
+  security-scan:
+    name: Container Security Scan
+    runs-on: ubuntu-latest
+    needs: [docker-variants]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build image for scanning
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./stratum/Dockerfile
+          tags: loka-stratum:scan
+          load: true
+          cache-from: type=gha,scope=release
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'loka-stratum:scan'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: Run Snyk Container Security scan
+        if: secrets.SNYK_TOKEN
+        uses: snyk/actions/docker@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          image: loka-stratum:scan
+          args: --severity-threshold=high
+
+  # Job 3: Image Size and Layer Analysis
+  image-analysis:
+    name: Image Analysis
+    runs-on: ubuntu-latest
+    needs: [docker-variants]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build image for analysis
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./stratum/Dockerfile
+          tags: loka-stratum:analysis
+          load: true
+          cache-from: type=gha,scope=release
+
+      - name: Analyze image size and layers
+        run: |
+          echo "=== Image Size Analysis ==="
+          docker images loka-stratum:analysis --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}"
+          
+          echo "=== Layer Analysis ==="
+          docker history loka-stratum:analysis --no-trunc
+          
+          echo "=== Image Contents ==="
+          docker run --rm loka-stratum:analysis find /usr/local/bin -name "loka-*" -exec ls -lh {} \;
+
+      - name: Generate SBOM (Software Bill of Materials)
+        uses: anchore/sbom-action@v0
+        with:
+          image: loka-stratum:analysis
+          format: spdx-json
+          output-file: sbom.spdx.json
+
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ github.sha }}
+          path: sbom.spdx.json
+
+  # Job 4: Multi-architecture Testing
+  multi-arch-test:
+    name: Multi-architecture Testing
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        platform: [linux/amd64, linux/arm64]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and test on ${{ matrix.platform }}
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./stratum/Dockerfile
+          platforms: ${{ matrix.platform }}
+          tags: loka-stratum:${{ matrix.platform }}
+          cache-from: type=gha,scope=release
+          outputs: type=docker,dest=/tmp/loka-stratum-${{ matrix.platform }}.tar
+
+      - name: Load and test image
+        run: |
+          # Load the image
+          docker load -i /tmp/loka-stratum-${{ matrix.platform }}.tar
+          
+          # Test that the binary works on this architecture
+          docker run --rm loka-stratum:${{ matrix.platform }} loka-stratum --help
+
+  # Job 5: Performance and Resource Testing
+  resource-test:
+    name: Resource & Performance Testing
+    runs-on: ubuntu-latest
+    needs: [docker-variants]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build image for testing
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./stratum/Dockerfile
+          tags: loka-stratum:resource-test
+          load: true
+          cache-from: type=gha,scope=release
+
+      - name: Resource consumption test
+        run: |
+          echo "=== Testing Resource Consumption ==="
+          
+          # Start container with resource limits
+          docker run --rm -d --name loka-resource-test \
+            --memory=512m \
+            --cpus=1.0 \
+            -p 3335:3333 -p 9095:9090 \
+            -e DATABASE_URL=postgres://test:test@localhost:5432/test \
+            loka-stratum:resource-test
+          
+          # Wait for startup
+          sleep 20
+          
+          # Monitor resource usage
+          echo "=== Container Stats ==="
+          docker stats loka-resource-test --no-stream
+          
+          # Test under light load
+          echo "=== Testing Health Endpoints ==="
+          curl -f http://localhost:9095/health
+          curl -f http://localhost:9095/metrics/prometheus > /dev/null
+          
+          # Cleanup
+          docker stop loka-resource-test
+
+      - name: Memory leak test
+        run: |
+          echo "=== Testing for Memory Leaks ==="
+          
+          # Start container
+          docker run --rm -d --name loka-memory-test \
+            --memory=256m \
+            -p 3336:3333 -p 9096:9090 \
+            -e DATABASE_URL=postgres://test:test@localhost:5432/test \
+            loka-stratum:resource-test
+          
+          # Monitor memory usage over time
+          for i in {1..30}; do
+            docker stats loka-memory-test --no-stream --format "table {{.MemUsage}}\t{{.MemPerc}}"
+            sleep 2
+          done
+          
+          # Cleanup
+          docker stop loka-memory-test
+
+  # Job 6: Container Registry Management
+  registry-cleanup:
+    name: Registry Cleanup
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    steps:
+      - name: Delete old container images
+        uses: actions/delete-package-versions@v5
+        with:
+          package-name: 'loka-stratum'
+          package-type: 'container'
+          min-versions-to-keep: 10
+          delete-only-untagged-versions: true
+
+  # Job 7: Dockerfile Linting
+  dockerfile-lint:
+    name: Dockerfile Linting
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run hadolint
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: stratum/Dockerfile
+          format: sarif
+          output-file: hadolint-results.sarif
+          no-fail: true
+
+      - name: Upload hadolint results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: hadolint-results.sarif
+
+      - name: Run Dockerfile best practices check
+        run: |
+          echo "=== Dockerfile Best Practices Check ==="
+          
+          # Check for best practices
+          if grep -q "USER.*root" stratum/Dockerfile; then
+            echo "❌ Running as root user detected"
+            exit 1
+          else
+            echo "✅ Non-root user configuration found"
+          fi
+          
+          if grep -q "HEALTHCHECK" stratum/Dockerfile; then
+            echo "✅ Health check configuration found"
+          else
+            echo "❌ No health check found"
+            exit 1
+          fi
+          
+          if grep -q "LABEL" stratum/Dockerfile; then
+            echo "✅ Labels found for metadata"
+          else
+            echo "⚠️ Consider adding labels for better metadata"
+          fi
+          
+          echo "✅ Dockerfile follows security best practices"

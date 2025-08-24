@@ -1,0 +1,104 @@
+global:
+  scrape_interval: 15s # Faster scraping for development
+  evaluation_interval: 10s # Faster alert evaluation for development
+  external_labels:
+    cluster: "loka-stratum"
+    environment: "development"
+    region: "local"
+
+rule_files:
+  - "rules/*.yml"
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+scrape_configs:
+  # Prometheus itself
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+    scrape_interval: 15s
+    metrics_path: /metrics
+
+  # Loka Stratum mining proxy - Development configuration
+  - job_name: "loka-stratum"
+    static_configs:
+      - targets: ["stratum:9090"]
+    scrape_interval: 5s # Very fast scraping for development
+    metrics_path: /metrics/prometheus
+    scrape_timeout: 5s # Fast timeout for development
+    honor_labels: true
+    honor_timestamps: true
+    metric_relabel_configs:
+      # Add instance label for better identification
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: "loka-stratum-dev"
+      # Add service label for better grouping
+      - target_label: service
+        replacement: "loka-stratum"
+      # Add environment label
+      - target_label: environment
+        replacement: "development"
+    params:
+      format: ["prometheus"]
+    sample_limit: 10000 # Higher limit for development testing
+
+  # Loka Stratum health check disabled - endpoint returns JSON, not Prometheus format
+  # - job_name: "loka-stratum-health"
+  #   static_configs:
+  #     - targets: ["stratum:9090"]
+  #   scrape_interval: 10s
+  #   metrics_path: /health
+  #   scrape_timeout: 3s
+
+  # Node Exporter (system metrics) - Development
+  - job_name: "node-exporter"
+    static_configs:
+      - targets: ["node-exporter:9100"]
+    scrape_interval: 15s # Faster for development
+    scrape_timeout: 10s
+    metrics_path: /metrics
+
+  # cAdvisor (container metrics) - Development
+  - job_name: "cadvisor"
+    static_configs:
+      - targets: ["cadvisor:8080"]
+    scrape_interval: 15s # Faster for development
+    scrape_timeout: 10s
+    metrics_path: /metrics
+
+  # AlertManager - Development
+  - job_name: "alertmanager"
+    static_configs:
+      - targets: ["alertmanager:9093"]
+    scrape_interval: 15s
+    metrics_path: /metrics
+
+  # Grafana - Development
+  - job_name: "grafana"
+    static_configs:
+      - targets: ["grafana:3000"]
+    scrape_interval: 15s
+    metrics_path: /metrics
+
+  # Error tracker (Pushgateway) - Development
+  - job_name: "error-tracker"
+    static_configs:
+      - targets: ["error-tracker:9091"]
+    scrape_interval: 5s # Very fast for development error tracking
+    metrics_path: /metrics
+    honor_labels: true
+
+  # Loki for log metrics - Development
+  - job_name: "loki"
+    static_configs:
+      - targets: ["loki:3100"]
+    scrape_interval: 15s
+    metrics_path: /metrics
+# Development specific configuration
+# Storage is configured via command line arguments with shorter retention for dev
+# Faster collection intervals for better development experience

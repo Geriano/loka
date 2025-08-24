@@ -1,1 +1,75 @@
+# Rust build artifacts
+target/
 /target
+Cargo.lock
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# CI/CD and development
+.github/
+.git/
+.gitignore
+.claude/
+.cursor/
+.taskmaster/
+
+# Documentation and non-essential files
+*.md
+LICENSE
+docs/
+examples/
+
+# Logs and temporary files
+*.log
+logs/
+tmp/
+temp/
+
+# Node.js (if any)
+node_modules/
+package-lock.json
+package.json
+
+# Operating system files
+.DS_Store
+Thumbs.db
+
+# Test files
+test_*
+*_test.py
+*_test.rs
+
+# Environment and config files
+.env*
+*.local
+
+# Monitoring and deployment configs (not needed in image)
+monitoring/
+docker-compose*.yml
+Dockerfile*
+!stratum/Dockerfile
+
+# Development scripts
+run_benchmarks.sh
+validate_performance.sh
+operational_test.sh
+
+# Migration binaries (use migration image for this)
+migration/target/
+
+# Benchmark results
+benches/results/
+criterion/
+
+# Database files
+*.db
+*.sqlite
+
+# Backup files
+*.bak
+*.backup

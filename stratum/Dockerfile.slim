@@ -1,0 +1,79 @@
+# Slim multi-stage build for Loka Stratum
+# Optimized for minimal size and attack surface
+
+# Stage 1: Build stage
+FROM rust:1.88-alpine AS builder
+
+# Install minimal build dependencies
+RUN apk add --no-cache musl-dev pkgconfig openssl-dev openssl-libs-static
+
+# Create app directory
+WORKDIR /app
+
+# Copy workspace files for dependency resolution
+COPY Cargo.toml Cargo.lock ./
+COPY stratum/Cargo.toml ./stratum/
+COPY model/Cargo.toml ./model/
+COPY migration/Cargo.toml ./migration/
+COPY utils/metrics/Cargo.toml ./utils/metrics/
+
+# Create dummy source files to build dependencies
+RUN mkdir -p stratum/src model/src migration/src utils/metrics/src && \
+    echo "fn main() {}" > stratum/src/main.rs && \
+    echo "// dummy" > stratum/src/lib.rs && \
+    echo "// dummy" > model/src/lib.rs && \
+    echo "// dummy" > migration/src/lib.rs && \
+    echo "// dummy" > utils/metrics/src/lib.rs
+
+# Build dependencies only
+RUN cargo build --release -p loka-stratum && \
+    rm -rf stratum/src model/src migration/src utils/metrics/src
+
+# Copy actual source code
+COPY stratum/src ./stratum/src
+COPY model/src ./model/src  
+COPY migration/src ./migration/src
+COPY utils/metrics/src ./utils/metrics/src
+
+# Build the application
+RUN cargo build --release -p loka-stratum
+
+# Stage 2: Slim runtime stage
+FROM alpine:3.19 AS slim
+
+# Install minimal runtime dependencies
+RUN apk add --no-cache ca-certificates tzdata tini && \
+    addgroup -g 1001 -S loka && \
+    adduser -u 1001 -S loka -G loka
+
+# Copy binary only
+COPY --from=builder /app/target/release/loka-stratum /usr/local/bin/loka-stratum
+
+# Create minimal directory structure
+RUN mkdir -p /app/config /app/data && chown -R loka:loka /app
+
+# Switch to non-root user
+USER loka
+WORKDIR /app
+
+# Health check with minimal overhead
+HEALTHCHECK --interval=60s --timeout=5s --start-period=10s --retries=2 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:9090/health || exit 1
+
+# Expose ports
+EXPOSE 3333 9090
+
+# Use tini for proper signal handling
+ENTRYPOINT ["/sbin/tini", "--"]
+
+# Minimal command
+CMD ["loka-stratum", "start", "--bind", "0.0.0.0:3333"]
+
+# Metadata
+LABEL maintainer="Geriano <geriano@nusantara.network>"
+LABEL description="High-performance Bitcoin Stratum V1 mining proxy (slim)"
+LABEL version="0.1.0"
+LABEL variant="slim"
+LABEL org.opencontainers.image.source="https://github.com/geriano/loka"
+LABEL org.opencontainers.image.description="Production-ready Bitcoin mining proxy (minimal size)"
+LABEL org.opencontainers.image.licenses="MIT"

@@ -1,0 +1,192 @@
+name: loka-development
+services:
+  # PostgreSQL Database for Development
+  postgres:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=root
+      - POSTGRES_PASSWORD=root
+      - POSTGRES_DB=loka
+    volumes:
+      - postgres-dev-data:/var/lib/postgresql/data
+      - ./monitoring/postgres/init-dev.sql:/docker-entrypoint-initdb.d/init-dev.sql:ro
+    ports:
+      - "5432"
+    networks:
+      - loka-dev-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U root"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for Development Caching
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-dev-data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - loka-dev-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # Loka Stratum Development Build
+  stratum:
+    build:
+      context: .
+      dockerfile: stratum/Dockerfile
+      target: debug
+    restart: unless-stopped
+    ports:
+      - "3333:3333"
+      - "9090:9090"
+    environment:
+      - DATABASE_URL=postgres://root:root@host.docker.internal:5432/loka
+      - RUST_LOG=debug
+      - RUST_BACKTRACE=full
+      - ENV=development
+    volumes:
+      - ./stratum/config:/app/config:ro
+      - stratum-data:/app/data
+      - stratum-logs:/app/logs
+      # Mount source for hot-reload development
+      - ./stratum/src:/workspace/stratum/src:ro
+      - ./model/src:/workspace/model/src:ro
+      - ./utils/metrics/src:/workspace/utils/metrics/src:ro
+    command: ["loka-stratum", "start"]
+    networks:
+      - loka-dev-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    labels:
+      - "prometheus.io/scrape=true"
+      - "prometheus.io/port=9090"
+      - "prometheus.io/path=/metrics/prometheus"
+
+  # Development Monitoring Stack
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=7d'
+      - '--storage.tsdb.retention.size=1GB'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+      - '--log.level=debug'
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.development.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/rules:/etc/prometheus/rules:ro
+      - prometheus-data:/prometheus
+    networks:
+      - loka-dev-network
+    depends_on:
+      - stratum
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Development Grafana
+  grafana:
+    image: grafana/grafana:10.2.0
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+      - GF_USERS_ALLOW_SIGN_UP=true
+      - GF_USERS_ALLOW_ORG_CREATE=true
+      - GF_ANALYTICS_REPORTING_ENABLED=false
+      - GF_ANALYTICS_CHECK_FOR_UPDATES=false
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
+      - GF_LOG_LEVEL=debug
+    ports:
+      - "3001:3000"
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    networks:
+      - loka-dev-network
+    depends_on:
+      - prometheus
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Development Tools Container
+  dev-tools:
+    image: alpine/curl:latest
+    restart: "no"
+    command: sleep 3600
+    networks:
+      - loka-dev-network
+    volumes:
+      - ./scripts:/scripts:ro
+    profiles: ["tools"]
+
+  # Load Testing Container (Optional)
+  load-tester:
+    image: alpine/curl:latest
+    restart: "no"
+    command: |
+      sh -c '
+        echo "Starting load test..."
+        for i in $$(seq 1 100); do
+          curl -X POST http://stratum:3333 \
+            -H "Content-Type: application/json" \
+            -d "{\"id\":$$i,\"method\":\"mining.authorize\",\"params\":[\"test.worker$$i\",\"password\"]}" &
+          if [ $$((i % 10)) -eq 0 ]; then
+            sleep 1
+          fi
+        done
+        wait
+        echo "Load test complete"
+      '
+    networks:
+      - loka-dev-network
+    depends_on:
+      - stratum
+    profiles: ["load-test"]
+
+volumes:
+  postgres-dev-data:
+    driver: local
+  redis-dev-data:
+    driver: local
+  stratum-data:
+    driver: local
+  stratum-logs:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local
+
+networks:
+  loka-dev-network:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: loka-dev-br0
