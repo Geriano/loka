@@ -38,7 +38,7 @@ impl NetworkHandler {
         Self {
             manager,
             // connection_manager,
-            processor: Arc::new(processor::Manager::default()),
+            processor: Arc::new(processor::Manager),
             connection,
         }
     }
@@ -93,7 +93,7 @@ impl NetworkHandler {
             tokio::join!(downstream_handler, upstream_handler, proxy_coordinator);
 
         // Handle results and log errors
-        if let Err(e) = downstream_result.map_err(|e| format!("Task join error: {}", e)) {
+        if let Err(e) = downstream_result.map_err(|e| format!("Task join error: {e}")) {
             error!(
                 "Connection {} - Downstream handler failed: {}",
                 self.connection.id(),
@@ -101,7 +101,7 @@ impl NetworkHandler {
             );
         }
 
-        if let Err(e) = upstream_result.map_err(|e| format!("Task join error: {}", e)) {
+        if let Err(e) = upstream_result.map_err(|e| format!("Task join error: {e}")) {
             error!(
                 "Connection {} - Upstream handler failed: {}",
                 self.connection.id(),
@@ -109,7 +109,7 @@ impl NetworkHandler {
             );
         }
 
-        if let Err(e) = proxy_result.map_err(|e| format!("Task join error: {}", e)) {
+        if let Err(e) = proxy_result.map_err(|e| format!("Task join error: {e}")) {
             error!(
                 "Connection {} - Proxy coordinator failed: {}",
                 self.connection.id(),
@@ -201,7 +201,7 @@ impl NetworkHandler {
                                         Ok(json) => downstream_to_upstream_tx
                                             .send(json)
                                             .map_err(|e| e.to_string()),
-                                        Err(e) => Err(format!("JSON parse error: {}", e)),
+                                        Err(e) => Err(format!("JSON parse error: {e}")),
                                     }
                                 }
                             };
@@ -325,7 +325,7 @@ impl NetworkHandler {
                                         Ok(json) => upstream_to_downstream_tx
                                             .send(json)
                                             .map_err(|e| e.to_string()),
-                                        Err(e) => Err(format!("JSON parse error: {}", e)),
+                                        Err(e) => Err(format!("JSON parse error: {e}")),
                                     }
                                 }
                                 Message::Notify { job_id } => {
@@ -345,7 +345,7 @@ impl NetworkHandler {
                                         Ok(json) => upstream_to_downstream_tx
                                             .send(json)
                                             .map_err(|e| e.to_string()),
-                                        Err(e) => Err(format!("JSON parse error: {}", e)),
+                                        Err(e) => Err(format!("JSON parse error: {e}")),
                                     }
                                 }
                                 _ => {
@@ -354,7 +354,7 @@ impl NetworkHandler {
                                         Ok(json) => upstream_to_downstream_tx
                                             .send(json)
                                             .map_err(|e| e.to_string()),
-                                        Err(e) => Err(format!("JSON parse error: {}", e)),
+                                        Err(e) => Err(format!("JSON parse error: {e}")),
                                     }
                                 }
                             };
@@ -462,7 +462,7 @@ impl NetworkHandler {
 
                         let request_str =
                             serde_json::to_string(&request).unwrap_or_else(|_| "{}".to_string());
-                        let request_line = format!("{}\n", request_str);
+                        let request_line = format!("{request_str}\n");
 
                         trace!(
                             "Connection {} - Forwarding request #{} to upstream",
@@ -506,7 +506,7 @@ impl NetworkHandler {
 
                         let response_str =
                             serde_json::to_string(&response).unwrap_or_else(|_| "{}".to_string());
-                        let response_line = format!("{}\n", response_str);
+                        let response_line = format!("{response_str}\n");
 
                         trace!(
                             "Connection {} - Forwarding response #{} to downstream",
@@ -582,20 +582,20 @@ impl NetworkHandler {
         connection
             .authenticate((*auth_state).clone())
             .await
-            .map_err(|e| format!("Authentication failed: {}", e))?;
+            .map_err(|e| format!("Authentication failed: {e}"))?;
 
         // Register with submissions manager
         manager.submissions().authenticated(auth_state);
 
         // Modify the authentication message for the pool
         let mut message = serde_json::from_str::<Value>(buffer.trim())
-            .map_err(|e| format!("JSON parse error: {}", e))?;
+            .map_err(|e| format!("JSON parse error: {e}"))?;
 
         let config = manager.config();
         let pool_username = config.pool.username.as_str();
         let pool_password = config.pool.password.as_deref().unwrap_or("x");
         let (s1, s2) = &config.pool.separator;
-        let combined_username = format!("{}{}{}{}{}", pool_username, s1, user, s2, worker);
+        let combined_username = format!("{pool_username}{s1}{user}{s2}{worker}");
 
         debug!(
             "Connection {} - Combined username: {}",
@@ -649,7 +649,7 @@ impl NetworkHandler {
 
         // Forward the submission
         let message = serde_json::from_str::<Value>(buffer.trim())
-            .map_err(|e| format!("JSON parse error: {}", e))?;
+            .map_err(|e| format!("JSON parse error: {e}"))?;
 
         sender.send(message).map_err(|e| e.to_string())
     }

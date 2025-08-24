@@ -27,7 +27,7 @@ impl Manager {
     fn handle_set_difficulty(&self, request: Request) -> Option<Message> {
         if let Some(params) = request.params {
             if let Some(params) = params.as_array() {
-                if let Some(Some(difficulty)) = params.get(0).map(|param| param.as_f64()) {
+                if let Some(Some(difficulty)) = params.first().map(|param| param.as_f64()) {
                     return Some(Message::SetDifficulty { difficulty });
                 }
             }
@@ -45,7 +45,7 @@ impl Manager {
                     password = Some(p.trim().to_owned());
                 }
 
-                if let Some(Some(cred)) = params.get(0).map(|param| param.as_str()) {
+                if let Some(Some(cred)) = params.first().map(|param| param.as_str()) {
                     let cred = cred.trim().to_lowercase();
 
                     if let Some((user, worker)) = cred.split_once('.') {
@@ -75,7 +75,7 @@ impl Manager {
     fn handle_notify(&self, request: Request) -> Option<Message> {
         if let Some(params) = request.params {
             if let Some(params) = params.as_array() {
-                if let Some(Some(job_id)) = params.get(0).map(|param| param.as_str()) {
+                if let Some(Some(job_id)) = params.first().map(|param| param.as_str()) {
                     return Some(Message::Notify {
                         job_id: job_id.to_owned(),
                     });

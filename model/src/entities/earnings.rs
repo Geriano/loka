@@ -11,7 +11,7 @@ pub struct Model {
     pub reward: i64,
     #[sea_orm(column_type = "Decimal(Some((3, 32)))")]
     pub hashrate_external: Decimal,
-    #[sea_orm(column_type = "Decimal(Some((3, 3)))")]
+    #[sea_orm(column_type = "Decimal(Some((3, 32)))")]
     pub hashrate_internal: Decimal,
     pub date: Date,
 }

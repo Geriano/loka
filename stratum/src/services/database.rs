@@ -35,7 +35,7 @@ impl DatabaseService {
             Database::connect(opt)
                 .await
                 .map_err(|e| crate::error::StratumError::Database {
-                    message: format!("Failed to connect to database: {}", e),
+                    message: format!("Failed to connect to database: {e}"),
                     source: Some(Box::new(e)),
                 })?;
 
@@ -66,7 +66,7 @@ impl DatabaseService {
             Database::connect(opt)
                 .await
                 .map_err(|e| crate::error::StratumError::Database {
-                    message: format!("Failed to connect to database: {}", e),
+                    message: format!("Failed to connect to database: {e}"),
                     source: Some(Box::new(e)),
                 })?;
 
@@ -86,7 +86,7 @@ impl DatabaseService {
     pub async fn migrate(&self) -> Result<()> {
         Migrator::up(&self.connection, None).await.map_err(|e| {
             crate::error::StratumError::Database {
-                message: format!("Failed to run migrations: {}", e),
+                message: format!("Failed to run migrations: {e}"),
                 source: Some(Box::new(e)),
             }
         })?;
@@ -101,7 +101,7 @@ impl DatabaseService {
             .ping()
             .await
             .map_err(|e| crate::error::StratumError::Database {
-                message: format!("Failed to ping database: {}", e),
+                message: format!("Failed to ping database: {e}"),
                 source: Some(Box::new(e)),
             })?;
 
@@ -115,7 +115,7 @@ impl DatabaseService {
             .one(&self.connection)
             .await
             .map_err(|e| crate::error::StratumError::Database {
-                message: format!("Failed to fetch pool config: {}", e),
+                message: format!("Failed to fetch pool config: {e}"),
                 source: Some(Box::new(e)),
             })?;
 
@@ -132,7 +132,7 @@ impl DatabaseService {
             .one(&self.connection)
             .await
             .map_err(|e| crate::error::StratumError::Database {
-                message: format!("Failed to fetch default pool config: {}", e),
+                message: format!("Failed to fetch default pool config: {e}"),
                 source: Some(Box::new(e)),
             })?;
 
@@ -150,7 +150,7 @@ impl DatabaseService {
             .one(&self.connection)
             .await
             .map_err(|e| crate::error::StratumError::Database {
-                message: format!("Failed to fetch pool config by name: {}", e),
+                message: format!("Failed to fetch pool config by name: {e}"),
                 source: Some(Box::new(e)),
             })?;
 
@@ -174,8 +174,7 @@ impl DatabaseService {
             .await
             .map_err(|e| crate::error::StratumError::Database {
                 message: format!(
-                    "Failed to fetch pool config by target {}:{}: {}",
-                    host, port, e
+                    "Failed to fetch pool config by target {host}:{port}: {e}"
                 ),
                 source: Some(Box::new(e)),
             })?;
@@ -193,7 +192,7 @@ impl DatabaseService {
             .all(&self.connection)
             .await
             .map_err(|e| crate::error::StratumError::Database {
-                message: format!("Failed to fetch active pool configs: {}", e),
+                message: format!("Failed to fetch active pool configs: {e}"),
                 source: Some(Box::new(e)),
             })?;
 
@@ -240,7 +239,7 @@ impl DatabaseService {
 
         new_pool.insert(&self.connection).await.map_err(|e| {
             crate::error::StratumError::Database {
-                message: format!("Failed to create pool config: {}", e),
+                message: format!("Failed to create pool config: {e}"),
                 source: Some(Box::new(e)),
             }
         })?;
@@ -255,7 +254,7 @@ impl DatabaseService {
             .one(&self.connection)
             .await
             .map_err(|e| crate::error::StratumError::Database {
-                message: format!("Failed to fetch pool for deactivation: {}", e),
+                message: format!("Failed to fetch pool for deactivation: {e}"),
                 source: Some(Box::new(e)),
             })?;
 
@@ -266,7 +265,7 @@ impl DatabaseService {
 
                 active_model.update(&self.connection).await.map_err(|e| {
                     crate::error::StratumError::Database {
-                        message: format!("Failed to deactivate pool config: {}", e),
+                        message: format!("Failed to deactivate pool config: {e}"),
                         source: Some(Box::new(e)),
                     }
                 })?;
@@ -275,7 +274,7 @@ impl DatabaseService {
                 Ok(())
             }
             None => Err(crate::error::StratumError::Internal {
-                message: format!("Pool with ID {} not found", pool_id),
+                message: format!("Pool with ID {pool_id} not found"),
             }),
         }
     }

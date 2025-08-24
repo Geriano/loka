@@ -60,7 +60,7 @@ impl Manager {
 
         // Create a simple share identifier based on submission ID and user
         // In a real implementation, this would include nonce, extranonce2, etc.
-        let share_id = format!("{}:{}", auth.to_string(), id);
+        let share_id = format!("{auth}:{id}");
         let user_key = auth.to_string();
 
         // Check for duplicate share

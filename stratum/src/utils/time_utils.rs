@@ -38,9 +38,9 @@ impl TimeUtils {
         } else if secs >= 60 {
             format!("{:.1}m", secs as f64 / 60.0)
         } else if secs >= 1 {
-            format!("{}.{:03}s", secs, millis)
+            format!("{secs}.{millis:03}s")
         } else {
-            format!("{}ms", millis + duration.subsec_micros() / 1000)
+            format!("{}ms", millis + duration.subsec_millis())
         }
     }
 

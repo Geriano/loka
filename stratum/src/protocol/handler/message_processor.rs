@@ -162,7 +162,7 @@ impl MessageProcessor {
         &self,
         message: &str,
         manager: &Manager,
-        config: &Config,
+        _config: &Config,
         addr: SocketAddr,
     ) -> Result<Option<Value>> {
         debug!("miner {} - Processing as HTTP message", addr);
@@ -231,7 +231,7 @@ impl MessageProcessor {
             // Route to Stratum handler and return response
             return self
                 .stratum_handler
-                .handle_parsed_message(&stratum_message, message, manager, config, addr, Some(&processed_context))
+                .handle_parsed_message(stratum_message, message, manager, config, addr, Some(&processed_context))
                 .await;
         } else {
             // Try manual parsing as fallback
@@ -255,7 +255,7 @@ impl MessageProcessor {
     /// Apply rate limiting to message processing.
     ///
     /// Checks if the client is within allowed message rate limits.
-    pub fn should_rate_limit(&self, addr: SocketAddr, manager: &Manager) -> bool {
+    pub fn should_rate_limit(&self, _addr: SocketAddr, _manager: &Manager) -> bool {
         // This would typically check against a rate limiter service
         // For now, always allow (no rate limiting)
         false

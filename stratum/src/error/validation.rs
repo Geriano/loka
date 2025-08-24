@@ -7,7 +7,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tracing::{debug, warn};
 
-use super::types::{Result, SecuritySeverity, StratumError};
+use super::types::{Result, StratumError};
 
 /// Validation context for requests
 #[derive(Debug, Clone)]
@@ -215,7 +215,7 @@ impl StratumProtocolValidator {
         Ok(())
     }
 
-    fn validate_method(&self, method: &str, params: &Value) -> Result<()> {
+    fn validate_method(&self, method: &str, _params: &Value) -> Result<()> {
         // REMOVED: All business validation logic removed to ensure transparent forwarding
         // The proxy now forwards ALL messages to the upstream pool regardless of content validity
         // Pool validation errors are relayed unchanged to miners
@@ -342,7 +342,7 @@ impl RateLimitValidator {
         self.cleanup_old_entries();
 
         let now = Instant::now();
-        let mut requests = self.ip_requests.entry(ip).or_insert_with(Vec::new);
+        let mut requests = self.ip_requests.entry(ip).or_default();
 
         // Count requests in the last second
         let second_ago = now - Duration::from_secs(1);
@@ -525,18 +525,19 @@ mod tests {
                 .is_err()
         );
 
-        // Invalid - dangerous username
+        // Dangerous content is now forwarded transparently to pool (no local validation)
         let dangerous_message = json!({
             "id": 1,
             "method": "mining.authorize",
             "params": ["<script>alert('xss')</script>", "pass"]
         });
 
+        // Should pass since we're in transparent forwarding mode
         assert!(
             validator
                 .validate(&dangerous_message, &context)
                 .await
-                .is_err()
+                .is_ok()
         );
     }
 
@@ -575,18 +576,19 @@ mod tests {
 
         assert!(validator.validate(&valid_message, &context).await.is_ok());
 
-        // Invalid message should fail
+        // Empty username now allowed in transparent forwarding mode
         let invalid_message = json!({
             "id": 1,
             "method": "mining.authorize",
-            "params": ["", "pass"] // empty username
+            "params": ["", "pass"] // empty username - forwarded to pool
         });
 
+        // Should pass since we're in transparent forwarding mode
         assert!(
             validator
                 .validate(&invalid_message, &context)
                 .await
-                .is_err()
+                .is_ok()
         );
     }
 }

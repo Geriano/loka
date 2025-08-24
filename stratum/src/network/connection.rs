@@ -12,6 +12,12 @@ use crate::error::Result;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ConnectionId(u64);
 
+impl Default for ConnectionId {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ConnectionId {
     pub fn new() -> Self {
         static COUNTER: AtomicU64 = AtomicU64::new(1);
@@ -67,10 +73,10 @@ impl std::fmt::Display for DisconnectReason {
             Self::ClientDisconnect => write!(f, "client disconnect"),
             Self::ServerShutdown => write!(f, "server shutdown"),
             Self::Timeout => write!(f, "connection timeout"),
-            Self::ProtocolError { message } => write!(f, "protocol error: {}", message),
+            Self::ProtocolError { message } => write!(f, "protocol error: {message}"),
             Self::AuthenticationFailed => write!(f, "authentication failed"),
             Self::RateLimited => write!(f, "rate limited"),
-            Self::NetworkError { error } => write!(f, "network error: {}", error),
+            Self::NetworkError { error } => write!(f, "network error: {error}"),
         }
     }
 }

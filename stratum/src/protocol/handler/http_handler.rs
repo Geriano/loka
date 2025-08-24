@@ -508,8 +508,7 @@ impl HttpHandler {
     /// Format an HTTP response with the given status.
     pub fn format_http_response(status_code: u16, status_text: &str) -> String {
         format!(
-            "HTTP/1.1 {} {}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n",
-            status_code, status_text
+            "HTTP/1.1 {status_code} {status_text}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n"
         )
     }
 

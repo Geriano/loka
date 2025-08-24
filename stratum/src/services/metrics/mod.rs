@@ -47,6 +47,7 @@
 
 pub mod atomic;
 pub mod calculated;
+pub mod constant;
 pub mod database;
 pub mod resource;
 pub mod service;
@@ -54,12 +55,18 @@ pub mod snapshot;
 pub mod timeseries;
 pub mod user;
 
+#[cfg(test)]
+pub mod hashrate_test;
+
+#[cfg(test)]
+pub mod prometheus_verification_test;
+
 // Re-export main types for convenience
 pub use atomic::AtomicMetrics;
 pub use calculated::CalculatedMetrics;
 pub use database::DatabaseMetrics;
 pub use resource::ResourceUtilizationSummary;
-pub use service::{MetricsService, MetricsConfig};
-pub use snapshot::{MetricsSnapshot, MetricsDelta, DeltaRates};
+pub use service::{MetricsConfig, MetricsService};
+pub use snapshot::{DeltaRates, MetricsDelta, MetricsSnapshot};
 pub use timeseries::TimeSeriesMetrics;
 pub use user::{UserMetrics, UserMetricsSnapshot};

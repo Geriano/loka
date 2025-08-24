@@ -37,7 +37,8 @@ impl submissions::Model {
               s.pool_id as pool_id,
               w.miner_id as miner_id,
               s.worker_id as worker_id,
-              sum(s.hashes) as hashrate_internal,
+              sum(s.hashes) as hashes_internal,
+              0 as hashes_external,
               ($1)::date as date
             from submissions s
             join pools p on p.id = s.pool_id
@@ -45,13 +46,14 @@ impl submissions::Model {
             where (s.submitted_at + (p.offsets * interval '1' minute))::date = ($1)::date
             group by s.pool_id, w.miner_id, s.worker_id, date
           )
-          insert into distributions (id, pool_id, miner_id, worker_id, hashrate_internal, date)
+          insert into distributions (id, pool_id, miner_id, worker_id, hashes_internal, hashes_external, date)
           select
             gen_random_uuid() as id,
             pool_id,
             miner_id,
             worker_id,
-            hashrate_internal,
+            hashes_internal,
+            hashes_external,
             date
           from ss"#;
 

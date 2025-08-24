@@ -83,6 +83,45 @@ groups:
       - record: loka:resource_pressure_rate
         expr: rate(stratum_resource_pressure_events[5m])
 
+      # Additional comprehensive metrics rules
+      - record: loka:connection_duration_avg
+        expr: stratum_connection_duration_avg_ms
+      
+      - record: loka:idle_time_current
+        expr: stratum_idle_time_gauge_ms
+      
+      - record: loka:stale_shares_rate
+        expr: rate(stratum_stale_shares_counter[5m])
+      
+      - record: loka:duplicate_shares_rate
+        expr: rate(stratum_duplicate_shares_counter[5m])
+      
+      - record: loka:auth_success_rate
+        expr: (stratum_auth_successes / (stratum_auth_successes + stratum_auth_failures)) * 100
+      
+      # Protocol traffic breakdown
+      - record: loka:http_requests_rate
+        expr: rate(stratum_http_requests_total[5m])
+      
+      - record: loka:stratum_requests_rate
+        expr: rate(stratum_stratum_requests_total[5m])
+      
+      - record: loka:http_connect_rate
+        expr: rate(stratum_http_connect_requests[5m])
+      
+      - record: loka:direct_stratum_rate
+        expr: rate(stratum_direct_stratum_connections[5m])
+      
+      # Security metrics
+      - record: loka:security_violation_rate
+        expr: rate(stratum_security_violation_errors_total[5m])
+      
+      - record: loka:resource_exhaustion_rate
+        expr: rate(stratum_resource_exhaustion_errors_total[5m])
+      
+      - record: loka:internal_error_rate
+        expr: rate(stratum_internal_errors_total[5m])
+
   - name: loka-stratum.alerts
     rules:
       # Critical Service Health Alerts
@@ -353,3 +392,81 @@ groups:
         annotations:
           summary: "High disk usage detected"
           description: "Disk usage is {{ $value | humanizePercentage }} on {{ $labels.instance }}"
+
+      # Additional comprehensive alerts for new metrics
+      - alert: HighIdleTime
+        expr: loka:idle_time_current > 30000
+        for: 5m
+        labels:
+          severity: warning
+          service: loka-stratum
+          category: performance
+        annotations:
+          summary: "High connection idle time detected"
+          description: "Connection idle time is {{ $value }}ms for 5 minutes"
+
+      - alert: LongConnectionDuration
+        expr: loka:connection_duration_avg > 3600000
+        for: 10m
+        labels:
+          severity: info
+          service: loka-stratum
+          category: connections
+        annotations:
+          summary: "Long average connection duration"
+          description: "Average connection duration is {{ $value }}ms for 10 minutes"
+
+      - alert: HighStaleSharesRate
+        expr: loka:stale_shares_rate > 2
+        for: 3m
+        labels:
+          severity: warning
+          service: loka-stratum
+          category: mining
+        annotations:
+          summary: "High stale shares rate detected"
+          description: "Stale shares occurring at {{ $value }} shares/second for 3 minutes"
+
+      - alert: HighDuplicateSharesRate
+        expr: loka:duplicate_shares_rate > 1
+        for: 3m
+        labels:
+          severity: warning
+          service: loka-stratum
+          category: mining
+        annotations:
+          summary: "High duplicate shares rate detected"
+          description: "Duplicate shares occurring at {{ $value }} shares/second for 3 minutes"
+
+      - alert: SecurityViolationsDetected
+        expr: loka:security_violation_rate > 0
+        for: 1m
+        labels:
+          severity: critical
+          service: loka-stratum
+          category: security
+        annotations:
+          summary: "Security violations detected"
+          description: "Security violations occurring at {{ $value }} events/second for 1 minute - possible attack"
+
+      - alert: LowAuthSuccessRate
+        expr: loka:auth_success_rate < 90
+        for: 5m
+        labels:
+          severity: warning
+          service: loka-stratum
+          category: authentication
+        annotations:
+          summary: "Low authentication success rate"
+          description: "Authentication success rate is {{ $value }}% for 5 minutes"
+
+      - alert: UnbalancedProtocolTraffic
+        expr: (loka:http_requests_rate / (loka:http_requests_rate + loka:stratum_requests_rate)) > 0.8
+        for: 5m
+        labels:
+          severity: info
+          service: loka-stratum
+          category: protocol
+        annotations:
+          summary: "Unbalanced protocol traffic detected"
+          description: "HTTP traffic represents over 80% of total requests for 5 minutes"

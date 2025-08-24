@@ -378,7 +378,7 @@ impl StratumError {
     pub fn with_context(self, context: &str) -> Self {
         match self {
             StratumError::Internal { message } => StratumError::Internal {
-                message: format!("{}: {}", context, message),
+                message: format!("{context}: {message}"),
             },
             other => other,
         }

@@ -63,14 +63,18 @@ pub struct ProtocolHandler {
     /// Shutdown flag for clean termination
     shutdown: Arc<AtomicBool>,
     /// Message processing pipeline
+    #[allow(dead_code)]
     pipeline: MessagePipeline,
     /// Protocol-specific metrics
     metrics: Arc<DefaultProtocolMetrics>,
     /// Pool configuration service
+    #[allow(dead_code)]
     pool_service: PoolConfigService,
     /// HTTP message handler
+    #[allow(dead_code)]
     http_handler: HttpHandler,
     /// Stratum message handler
+    #[allow(dead_code)]
     stratum_handler: StratumHandler,
     /// Message processor and router
     message_processor: MessageProcessor,
@@ -252,7 +256,7 @@ impl ProtocolHandler {
     fn spawn_downstream_handler(
         &self,
         downstream_read: OwnedReadHalf,
-        downstream_to_upstream_tx: mpsc::UnboundedSender<serde_json::Value>,
+        _downstream_to_upstream_tx: mpsc::UnboundedSender<serde_json::Value>,
     ) -> JoinHandle<Result<()>> {
         let manager = self.manager.clone();
         let config = self.config.clone();
@@ -281,7 +285,7 @@ impl ProtocolHandler {
 
                             // Process through the message processor
                             if let Err(e) = message_processor
-                                .process_message(&raw_message, &manager, &config, addr)
+                                .process_message(raw_message, &manager, &config, addr)
                                 .await
                             {
                                 warn!("miner {} - Message processing error: {}", addr, e);
@@ -311,7 +315,7 @@ impl ProtocolHandler {
         upstream_to_downstream_tx: mpsc::UnboundedSender<serde_json::Value>,
     ) -> JoinHandle<Result<()>> {
         let addr = self.addr;
-        let manager = self.manager.clone();
+        let _manager = self.manager.clone();
         let shutdown = self.shutdown.clone();
 
         tokio::spawn(async move {
@@ -334,7 +338,7 @@ impl ProtocolHandler {
                             trace!("miner {} - Upstream message: {}", addr, raw_message);
 
                             // Parse and forward to client
-                            if let Ok(json_value) = serde_json::from_str(&raw_message) {
+                            if let Ok(json_value) = serde_json::from_str(raw_message) {
                                 if let Err(e) = upstream_to_downstream_tx.send(json_value) {
                                     warn!("miner {} - Failed to forward upstream message: {}", addr, e);
                                     break;
@@ -492,6 +496,56 @@ impl ProtocolHandler {
                             break;
                         }
                         Ok(_) => {
+                            let trimmed_message = downstream_line.trim();
+                            
+                            // Handle HTTP CONNECT requests locally instead of forwarding them
+                            if trimmed_message.starts_with("CONNECT ") {
+                                info!("miner {} - Handling HTTP CONNECT request locally", self.addr);
+                                
+                                // Extract CONNECT target
+                                if let Some(target) = HttpHandler::parse_connect_target_from_message(trimmed_message) {
+                                    debug!("miner {} - CONNECT target: {}", self.addr, target);
+                                    
+                                    // Send HTTP 200 Connection Established response to client
+                                    let connect_response = "HTTP/1.1 200 Connection established\r\n\r\n";
+                                    if let Err(e) = downstream_writer.write_all(connect_response.as_bytes()).await {
+                                        warn!("miner {} - Failed to send CONNECT response: {}", self.addr, e);
+                                        break;
+                                    }
+                                    if let Err(e) = downstream_writer.flush().await {
+                                        warn!("miner {} - Failed to flush CONNECT response: {}", self.addr, e);
+                                        break;
+                                    }
+                                    
+                                    info!("miner {} - Sent HTTP 200 Connection Established", self.addr);
+                                    
+                                    // Now we're in tunnel mode - continue to next message
+                                    downstream_line.clear();
+                                    continue;
+                                } else {
+                                    warn!("miner {} - Invalid CONNECT target format", self.addr);
+                                    // Send HTTP 400 Bad Request
+                                    let error_response = "HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n";
+                                    if let Err(e) = downstream_writer.write_all(error_response.as_bytes()).await {
+                                        warn!("miner {} - Failed to send 400 response: {}", self.addr, e);
+                                    }
+                                    if let Err(e) = downstream_writer.flush().await {
+                                        warn!("miner {} - Failed to flush 400 response: {}", self.addr, e);
+                                    }
+                                    break;
+                                }
+                            }
+                            
+                            // Skip other HTTP headers during CONNECT handshake
+                            if trimmed_message.starts_with("Host: ") || 
+                               trimmed_message.starts_with("Proxy-Connection: ") ||
+                               trimmed_message.starts_with("Connection: ") ||
+                               trimmed_message.is_empty() {
+                                trace!("miner {} - Skipping HTTP header: {}", self.addr, trimmed_message);
+                                downstream_line.clear();
+                                continue;
+                            }
+                            
                             // Process message for normalization and metrics only
                             // NO local responses - everything is forwarded to real pool
                             let message_to_forward = match self.message_processor.process_message(&downstream_line, &self.manager, &self.config, self.addr).await {

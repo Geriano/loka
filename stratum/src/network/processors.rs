@@ -19,8 +19,10 @@ pub struct LoggingProcessor {
 }
 
 #[derive(Debug, Clone, Copy)]
+#[derive(Default)]
 pub enum LogLevel {
     Trace,
+    #[default]
     Debug,
     Info,
     Warn,
@@ -28,11 +30,6 @@ pub enum LogLevel {
     Off,
 }
 
-impl Default for LogLevel {
-    fn default() -> Self {
-        LogLevel::Debug
-    }
-}
 
 impl LoggingProcessor {
     pub fn new(log_level: LogLevel) -> Self {
@@ -126,7 +123,7 @@ impl StratumProcessor {
         let username = config.pool.username.as_str();
         let password = config.pool.password.as_deref().unwrap_or("x");
         let (s1, s2) = &config.pool.separator;
-        let current = format!("{}{}{}{}{}", username, s1, user, s2, worker);
+        let current = format!("{username}{s1}{user}{s2}{worker}");
 
         debug!("authenticate {}.{} as {}", user, worker, current);
 
@@ -294,6 +291,12 @@ impl std::fmt::Debug for CompositeProcessor {
     }
 }
 
+impl Default for CompositeProcessor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CompositeProcessor {
     pub fn new() -> Self {
         Self {
@@ -395,6 +398,12 @@ impl MessageProcessor for RateLimitProcessor {
 #[derive(Debug)]
 pub struct MetricsProcessor {
     // TODO: Add metrics collection implementation
+}
+
+impl Default for MetricsProcessor {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl MetricsProcessor {

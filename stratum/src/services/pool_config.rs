@@ -283,15 +283,14 @@ impl PoolConfigService {
     }
 
     fn find_in_cache_by_target(&self, host: &str, port: u16) -> Option<PoolConfig> {
-        let address = format!("{}:{}", host, port);
+        let address = format!("{host}:{port}");
 
         if let Ok(cache) = self.inner.cache.read() {
             for cached in cache.pools.values() {
-                if cached.cached_at.elapsed() < self.inner.config.cache_ttl {
-                    if cached.config.address == address {
+                if cached.cached_at.elapsed() < self.inner.config.cache_ttl
+                    && cached.config.address == address {
                         return Some(cached.config.clone());
                     }
-                }
             }
         }
         None
@@ -299,7 +298,7 @@ impl PoolConfigService {
 
     /// Check if a target host:port combination is valid for a known pool
     pub async fn is_valid_target(&self, host: &str, port: u16) -> bool {
-        let target = format!("{}:{}", host, port);
+        let target = format!("{host}:{port}");
         
         // Check if we have a pool configuration for this target
         match self.get_pool_config_by_target(&target).await {

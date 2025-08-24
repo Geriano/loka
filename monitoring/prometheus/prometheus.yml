@@ -1,9 +1,10 @@
 global:
   scrape_interval: 30s
-  evaluation_interval: 30s
+  evaluation_interval: 15s # Faster alert evaluation for mining operations
   external_labels:
     cluster: "loka-stratum"
     environment: "production"
+    region: "local"
 
 rule_files:
   - "rules/*.yml"
@@ -22,16 +23,30 @@ scrape_configs:
     scrape_interval: 30s
     metrics_path: /metrics
 
-  # Loka Stratum mining proxy
+  # Loka Stratum mining proxy - Enhanced configuration for comprehensive metrics
   - job_name: "loka-stratum"
     static_configs:
-      - targets: ["host.docker.internal:9091"]
-    scrape_interval: 30s
+      - targets:
+          ["host.docker.internal:9090", "0.0.0.0:9090", "loka-stratum-1:9090"]
+    scrape_interval: 15s # Increased frequency for mining operations monitoring
     metrics_path: /metrics/prometheus
-    scrape_timeout: 15s
+    scrape_timeout: 10s # Reduced timeout for faster failure detection
     honor_labels: true
+    honor_timestamps: true # Preserve metric timestamps
+    metric_relabel_configs:
+      # Add instance label for better identification
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: "loka-stratum-main"
+      # Add service label for better grouping
+      - target_label: service
+        replacement: "loka-stratum"
+      # Add environment label
+      - target_label: environment
+        replacement: "production"
     params:
       format: ["prometheus"]
+    sample_limit: 5000 # Allow up to 5000 samples for comprehensive metrics
 
   # Loka Stratum health check (disabled - endpoint returns JSON, not Prometheus format)
   # - job_name: 'loka-stratum-health'

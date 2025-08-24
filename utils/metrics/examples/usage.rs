@@ -31,7 +31,7 @@ fn main() {
 
 fn simulate_cpu_monitoring() {
     // Simulate CPU usage over time
-    let cpu_readings = vec![15.2, 23.7, 45.1, 67.8, 89.2, 95.5, 78.3, 56.7, 34.2, 12.8];
+    let cpu_readings = [15.2, 23.7, 45.1, 67.8, 89.2, 95.5, 78.3, 56.7, 34.2, 12.8];
 
     for (i, usage) in cpu_readings.iter().enumerate() {
         // Record individual CPU readings
@@ -53,7 +53,7 @@ fn simulate_cpu_monitoring() {
 
 fn simulate_memory_monitoring() {
     // Simulate memory usage in MB
-    let memory_readings = vec![128.5, 256.0, 512.3, 1024.7, 2048.1, 4096.5, 8192.0];
+    let memory_readings = [128.5, 256.0, 512.3, 1024.7, 2048.1, 4096.5, 8192.0];
 
     for (i, usage) in memory_readings.iter().enumerate() {
         // Record memory usage histogram
@@ -78,7 +78,7 @@ fn simulate_memory_monitoring() {
 
 fn simulate_response_time_monitoring() {
     // Simulate API response times in milliseconds
-    let response_times = vec![12.5, 45.2, 78.9, 156.3, 234.7, 456.1, 789.5, 1234.7];
+    let response_times = [12.5, 45.2, 78.9, 156.3, 234.7, 456.1, 789.5, 1234.7];
 
     for (i, time) in response_times.iter().enumerate() {
         // Record response time histogram
@@ -105,7 +105,7 @@ fn simulate_response_time_monitoring() {
 
 fn simulate_batch_operations() {
     // Simulate batch processing with record_many
-    let batch_sizes = vec![100, 500, 1000, 5000, 10000];
+    let batch_sizes = [100, 500, 1000, 5000, 10000];
 
     for (i, batch_size) in batch_sizes.iter().enumerate() {
         // Simulate processing time based on batch size

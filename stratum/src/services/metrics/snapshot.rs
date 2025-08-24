@@ -462,49 +462,62 @@ impl MetricsSnapshot {
         let mut output = String::with_capacity(4096);
 
         // Connection metrics
-        output.push_str(&format!("# HELP stratum_connections_total Total number of connections\n"));
-        output.push_str(&format!("# TYPE stratum_connections_total counter\n"));
+        output.push_str("# HELP stratum_connections_total Total number of connections\n");
+        output.push_str("# TYPE stratum_connections_total counter\n");
         output.push_str(&format!("stratum_connections_total {}\n", self.total_connections));
         
-        output.push_str(&format!("# HELP stratum_connections_active Current active connections\n"));
-        output.push_str(&format!("# TYPE stratum_connections_active gauge\n"));
+        output.push_str("# HELP stratum_connections_active Current active connections\n");
+        output.push_str("# TYPE stratum_connections_active gauge\n");
         output.push_str(&format!("stratum_connections_active {}\n", self.active_connections));
 
         // Protocol metrics
-        output.push_str(&format!("# HELP stratum_messages_received_total Messages received\n"));
-        output.push_str(&format!("# TYPE stratum_messages_received_total counter\n"));
+        output.push_str("# HELP stratum_messages_received_total Messages received\n");
+        output.push_str("# TYPE stratum_messages_received_total counter\n");
         output.push_str(&format!("stratum_messages_received_total {}\n", self.messages_received));
 
-        output.push_str(&format!("# HELP stratum_bytes_received_total Bytes received\n"));
-        output.push_str(&format!("# TYPE stratum_bytes_received_total counter\n"));
+        output.push_str("# HELP stratum_bytes_received_total Bytes received\n");
+        output.push_str("# TYPE stratum_bytes_received_total counter\n");
         output.push_str(&format!("stratum_bytes_received_total {}\n", self.bytes_received));
 
         // Mining metrics
-        output.push_str(&format!("# HELP stratum_shares_submitted_total Shares submitted\n"));
-        output.push_str(&format!("# TYPE stratum_shares_submitted_total counter\n"));
+        output.push_str("# HELP stratum_shares_submitted_total Shares submitted\n");
+        output.push_str("# TYPE stratum_shares_submitted_total counter\n");
         output.push_str(&format!("stratum_shares_submitted_total {}\n", self.share_submissions));
 
-        output.push_str(&format!("# HELP stratum_shares_accepted_total Shares accepted\n"));
-        output.push_str(&format!("# TYPE stratum_shares_accepted_total counter\n"));
+        output.push_str("# HELP stratum_shares_accepted_total Shares accepted\n");
+        output.push_str("# TYPE stratum_shares_accepted_total counter\n");
         output.push_str(&format!("stratum_shares_accepted_total {}\n", self.submissions_accepted));
 
-        output.push_str(&format!("# HELP stratum_share_acceptance_rate Share acceptance rate\n"));
-        output.push_str(&format!("# TYPE stratum_share_acceptance_rate gauge\n"));
+        output.push_str("# HELP stratum_share_acceptance_rate Share acceptance rate\n");
+        output.push_str("# TYPE stratum_share_acceptance_rate gauge\n");
         output.push_str(&format!("stratum_share_acceptance_rate {:.4}\n", self.share_acceptance_rate));
 
+        // Hashrate metrics
+        output.push_str("# HELP stratum_hashrate_estimate_hs Estimated hashrate in H/s\n");
+        output.push_str("# TYPE stratum_hashrate_estimate_hs gauge\n");
+        output.push_str(&format!("stratum_hashrate_estimate_hs {:.2}\n", self.hashrate_estimate));
+
+        output.push_str("# HELP stratum_hashrate_estimate_mhs Estimated hashrate in MH/s\n");
+        output.push_str("# TYPE stratum_hashrate_estimate_mhs gauge\n");
+        output.push_str(&format!("stratum_hashrate_estimate_mhs {:.4}\n", self.hashrate_estimate / 1_000_000.0));
+
+        output.push_str("# HELP stratum_difficulty_current Current mining difficulty\n");
+        output.push_str("# TYPE stratum_difficulty_current gauge\n");
+        output.push_str(&format!("stratum_difficulty_current {:.6}\n", self.current_difficulty));
+
         // Performance metrics
-        output.push_str(&format!("# HELP stratum_response_time_ms Response time in milliseconds\n"));
-        output.push_str(&format!("# TYPE stratum_response_time_ms summary\n"));
+        output.push_str("# HELP stratum_response_time_ms Response time in milliseconds\n");
+        output.push_str("# TYPE stratum_response_time_ms summary\n");
         output.push_str(&format!("stratum_response_time_ms{{quantile=\"0.5\"}} {:.2}\n", self.avg_response_time_ms));
         output.push_str(&format!("stratum_response_time_ms{{quantile=\"1.0\"}} {:.2}\n", self.max_response_time_ms));
 
         // Resource metrics
-        output.push_str(&format!("# HELP stratum_memory_usage_bytes Memory usage\n"));
-        output.push_str(&format!("# TYPE stratum_memory_usage_bytes gauge\n"));
+        output.push_str("# HELP stratum_memory_usage_bytes Memory usage\n");
+        output.push_str("# TYPE stratum_memory_usage_bytes gauge\n");
         output.push_str(&format!("stratum_memory_usage_bytes {}\n", self.memory_usage_bytes));
 
-        output.push_str(&format!("# HELP stratum_cpu_usage_percent CPU usage percentage\n"));
-        output.push_str(&format!("# TYPE stratum_cpu_usage_percent gauge\n"));
+        output.push_str("# HELP stratum_cpu_usage_percent CPU usage percentage\n");
+        output.push_str("# TYPE stratum_cpu_usage_percent gauge\n");
         output.push_str(&format!("stratum_cpu_usage_percent {:.2}\n", self.cpu_usage_percent));
 
         output

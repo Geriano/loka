@@ -46,8 +46,7 @@ fn main() {
         let range_start = slot as f64 * 10.0;
         let range_end = (slot + 1) as f64 * 10.0;
         println!(
-            "Value {:>6.1} → Slot {:>2} [{:>6.1}, {:<6.1})",
-            value, slot, range_start, range_end
+            "Value {value:>6.1} → Slot {slot:>2} [{range_start:>6.1}, {range_end:<6.1})"
         );
     }
 
@@ -88,9 +87,9 @@ fn benchmark_histogram_operations() {
     let ops_per_sec = iterations as f64 / duration.as_secs_f64();
 
     println!("Single record operations:");
-    println!("  Iterations: {}", iterations);
-    println!("  Duration: {:.2?}", duration);
-    println!("  Operations/sec: {:.0}", ops_per_sec);
+    println!("  Iterations: {iterations}");
+    println!("  Duration: {duration:.2?}");
+    println!("  Operations/sec: {ops_per_sec:.0}");
     println!(
         "  Average time per operation: {:.3} ns",
         duration.as_nanos() as f64 / iterations as f64
@@ -122,8 +121,8 @@ fn benchmark_record_many_vs_single() {
     }
     let batch_duration = start.elapsed();
 
-    println!("Single record ({} operations):", iterations);
-    println!("  Duration: {:.2?}", single_duration);
+    println!("Single record ({iterations} operations):");
+    println!("  Duration: {single_duration:.2?}");
     println!(
         "  Operations/sec: {:.0}",
         iterations as f64 / single_duration.as_secs_f64()
@@ -134,14 +133,14 @@ fn benchmark_record_many_vs_single() {
         iterations / batch_size,
         batch_size
     );
-    println!("  Duration: {:.2?}", batch_duration);
+    println!("  Duration: {batch_duration:.2?}");
     println!(
         "  Operations/sec: {:.0}",
         iterations as f64 / batch_duration.as_secs_f64()
     );
 
     let speedup = single_duration.as_nanos() as f64 / batch_duration.as_nanos() as f64;
-    println!("Speedup: {:.2}x", speedup);
+    println!("Speedup: {speedup:.2}x");
 }
 
 fn benchmark_concurrent_operations() {
@@ -180,11 +179,11 @@ fn benchmark_concurrent_operations() {
     let ops_per_sec = total_operations as f64 / duration.as_secs_f64();
 
     println!("Concurrent operations:");
-    println!("  Threads: {}", num_threads);
-    println!("  Operations per thread: {}", operations_per_thread);
-    println!("  Total operations: {}", total_operations);
-    println!("  Duration: {:.2?}", duration);
-    println!("  Operations/sec: {:.0}", ops_per_sec);
+    println!("  Threads: {num_threads}");
+    println!("  Operations per thread: {operations_per_thread}");
+    println!("  Total operations: {total_operations}");
+    println!("  Duration: {duration:.2?}");
+    println!("  Operations/sec: {ops_per_sec:.0}");
     println!("  Final count: {}", histogram.count());
     println!("  Final sum: {:.1}", histogram.sum());
 }

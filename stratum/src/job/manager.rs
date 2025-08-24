@@ -87,7 +87,7 @@ impl Manager {
             loop {
                 ticker.tick().await;
 
-                (&jobs).retain(|id, job| {
+                jobs.retain(|id, job| {
                     // clear job when job notified got expired
                     let should_keep = job.elapsed() <= expiration;
                     if !should_keep {

@@ -85,7 +85,7 @@ impl TimeSeriesMetrics {
         
         let data = self.data_points
             .entry(metric_name.to_string())
-            .or_insert_with(VecDeque::new);
+            .or_default();
             
         // Add new data point
         data.push_back((now, value));
@@ -215,6 +215,7 @@ impl TimeSeriesMetrics {
     }
 
     /// Clean up old data points beyond window duration or max samples.
+    #[allow(dead_code)]
     fn cleanup_old_data(&self, data: &mut VecDeque<(SystemTime, f64)>) {
         Self::cleanup_old_data_static(data, self.window_duration, self.max_samples);
     }

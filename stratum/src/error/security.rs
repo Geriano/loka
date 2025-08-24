@@ -222,7 +222,7 @@ impl SecurityGuard {
         if let Some(blocked_at) = self.blocked_ips.get(&ip) {
             if blocked_at.elapsed() < self.policy.violation_block_time {
                 return Err(StratumError::SecurityViolation {
-                    message: format!("IP {} is temporarily blocked", ip),
+                    message: format!("IP {ip} is temporarily blocked"),
                     severity: SecuritySeverity::High,
                 });
             } else {
@@ -242,7 +242,7 @@ impl SecurityGuard {
             });
 
             return Err(StratumError::SecurityViolation {
-                message: format!("IP {} is banned", ip),
+                message: format!("IP {ip} is banned"),
                 severity: SecuritySeverity::Critical,
             });
         }
@@ -265,7 +265,7 @@ impl SecurityGuard {
                 });
 
                 return Err(StratumError::SecurityViolation {
-                    message: format!("IP {} not in allowed ranges", ip),
+                    message: format!("IP {ip} not in allowed ranges"),
                     severity: SecuritySeverity::High,
                 });
             }
@@ -326,7 +326,7 @@ impl SecurityGuard {
         let now = Instant::now();
         let hour_ago = now - Duration::from_secs(3600);
 
-        let mut attempts = self.ip_auth_attempts.entry(ip).or_insert_with(Vec::new);
+        let mut attempts = self.ip_auth_attempts.entry(ip).or_default();
 
         // Clean old attempts
         attempts.retain(|&timestamp| timestamp > hour_ago);
@@ -345,7 +345,7 @@ impl SecurityGuard {
             });
 
             return Err(StratumError::SecurityViolation {
-                message: format!("Too many authentication attempts from IP {}", ip),
+                message: format!("Too many authentication attempts from IP {ip}"),
                 severity: SecuritySeverity::Medium,
             });
         }
@@ -361,7 +361,7 @@ impl SecurityGuard {
         let now = Instant::now();
         let second_ago = now - Duration::from_secs(1);
 
-        let mut request_times = self.ip_requests.entry(ip).or_insert_with(Vec::new);
+        let mut request_times = self.ip_requests.entry(ip).or_default();
 
         // Clean old requests
         request_times.retain(|&timestamp| timestamp > second_ago);

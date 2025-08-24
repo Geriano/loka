@@ -9,10 +9,7 @@ use tokio::sync::RwLock;
 use tokio::time::interval;
 use tracing::{debug, error, info};
 
-use super::{
-    AtomicMetrics, DatabaseMetrics, MetricsSnapshot,
-    TimeSeriesMetrics, UserMetrics,
-};
+use super::{AtomicMetrics, DatabaseMetrics, MetricsSnapshot, TimeSeriesMetrics, UserMetrics};
 use crate::services::database::DatabaseService;
 use crate::services::performance::ResourceMonitor;
 
@@ -27,6 +24,10 @@ pub struct MetricsConfig {
     pub max_samples: usize,
     /// Whether to persist metrics to database
     pub persist_to_database: bool,
+    /// How often to calculate hashrate (default: every 60 seconds)
+    pub hashrate_calculation_interval: Duration,
+    /// Time window for hashrate calculation (default: 300 seconds/5 minutes)
+    pub hashrate_time_window: Duration,
 }
 
 impl Default for MetricsConfig {
@@ -34,8 +35,10 @@ impl Default for MetricsConfig {
         Self {
             snapshot_interval: Duration::from_secs(30),
             retention_duration: Duration::from_secs(3600), // 1 hour
-            max_samples: 120, // 120 samples at 30s = 1 hour
+            max_samples: 120,                              // 120 samples at 30s = 1 hour
             persist_to_database: true,
+            hashrate_calculation_interval: Duration::from_secs(60), // Calculate every minute
+            hashrate_time_window: Duration::from_secs(300),         // 5-minute rolling window
         }
     }
 }
@@ -53,7 +56,7 @@ impl Default for MetricsConfig {
 ///
 /// let config = MetricsConfig::default();
 /// let service = MetricsService::new(config);
-/// 
+///
 /// // Note: capturing snapshots requires async runtime
 /// // tokio::runtime::Runtime::new().unwrap().block_on(async {
 /// //     let snapshot = service.capture_snapshot().await;
@@ -115,7 +118,7 @@ impl MetricsService {
     /// Create a new metrics service with just configuration.
     ///
     /// This creates a new atomic metrics instance internally.
-    /// 
+    ///
     /// # Arguments
     ///
     /// * `config` - Custom metrics configuration
@@ -187,6 +190,12 @@ impl MetricsService {
             });
         }
 
+        // Start periodic hashrate calculation
+        let service_clone = self.clone_for_background();
+        tokio::spawn(async move {
+            service_clone.run_hashrate_calculation().await;
+        });
+
         Ok(())
     }
 
@@ -208,14 +217,15 @@ impl MetricsService {
         // Add resource utilization if available
         if let Some(resource_monitor) = &self.resource_monitor {
             let resource_summary = resource_monitor.get_utilization_summary().await;
-            snapshot.memory_usage_bytes = (resource_summary.current_memory_mb * 1024.0 * 1024.0) as u64;
+            snapshot.memory_usage_bytes =
+                (resource_summary.current_memory_mb * 1024.0 * 1024.0) as u64;
             snapshot.cpu_usage_percent = resource_summary.current_cpu_percent;
         }
 
         // Add database metrics
-        let db_metrics = self.database_metrics.read().await;
+        let _db_metrics = self.database_metrics.read().await;
         // Database metrics are included in the comprehensive snapshot structure
-        
+
         snapshot
     }
 
@@ -249,7 +259,11 @@ impl MetricsService {
     /// # Returns
     ///
     /// Moving average if enough data exists
-    pub async fn get_time_series_average(&self, metric_name: &str, sample_count: usize) -> Option<f64> {
+    pub async fn get_time_series_average(
+        &self,
+        metric_name: &str,
+        sample_count: usize,
+    ) -> Option<f64> {
         let ts = self.time_series.read().await;
         ts.get_moving_average(metric_name, sample_count)
     }
@@ -289,12 +303,13 @@ impl MetricsService {
     }
 
     /// Run periodic snapshot collection.
+    #[allow(dead_code)]
     async fn run_snapshot_collection(&self) {
         let mut interval = interval(self.config.snapshot_interval);
-        
+
         loop {
             interval.tick().await;
-            
+
             match self.capture_and_store_snapshot().await {
                 Ok(_) => {
                     debug!("Captured metrics snapshot");
@@ -307,31 +322,41 @@ impl MetricsService {
     }
 
     /// Capture snapshot and store in time series.
-    async fn capture_and_store_snapshot(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    #[allow(dead_code)]
+    async fn capture_and_store_snapshot(
+        &self,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let snapshot = self.capture_snapshot().await;
         let mut ts = self.time_series.write().await;
 
         // Store key metrics in time series
         ts.record_metric("active_connections", snapshot.active_connections as f64);
         ts.record_metric("messages_per_second", snapshot.messages_received as f64);
-        ts.record_metric("bytes_per_second", (snapshot.bytes_received + snapshot.bytes_sent) as f64);
+        ts.record_metric(
+            "bytes_per_second",
+            (snapshot.bytes_received + snapshot.bytes_sent) as f64,
+        );
         ts.record_metric("cpu_usage_percent", snapshot.cpu_usage_percent);
-        ts.record_metric("memory_usage_mb", (snapshot.memory_usage_bytes / (1024 * 1024)) as f64);
+        ts.record_metric(
+            "memory_usage_mb",
+            (snapshot.memory_usage_bytes / (1024 * 1024)) as f64,
+        );
 
         Ok(())
     }
 
     /// Run database persistence (if configured).
+    #[allow(dead_code)]
     async fn run_database_persistence(&self) {
         if self.database_service.is_none() {
             return;
         }
 
         let mut interval = interval(Duration::from_secs(300)); // Every 5 minutes
-        
+
         loop {
             interval.tick().await;
-            
+
             match self.persist_metrics_to_database().await {
                 Ok(_) => {
                     debug!("Persisted metrics to database");
@@ -344,9 +369,12 @@ impl MetricsService {
     }
 
     /// Persist current metrics to database.
-    async fn persist_metrics_to_database(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        if let Some(db_service) = &self.database_service {
-            let snapshot = self.capture_snapshot().await;
+    #[allow(dead_code)]
+    async fn persist_metrics_to_database(
+        &self,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        if let Some(_db_service) = &self.database_service {
+            let _snapshot = self.capture_snapshot().await;
             // Implementation would depend on database schema for metrics storage
             // This is a placeholder for actual database persistence logic
             debug!("Would persist metrics snapshot to database");
@@ -355,7 +383,7 @@ impl MetricsService {
     }
 
     // ===== DELEGATION METHODS TO ATOMIC METRICS =====
-    
+
     /// Record a new connection.
     pub fn record_connection(&self) {
         self.atomic_metrics.increment_connection();
@@ -458,7 +486,8 @@ impl MetricsService {
 
     /// Update resource utilization.
     pub fn update_resource_utilization(&self, memory_mb: f64, cpu_percent: f64) {
-        self.atomic_metrics.update_resource_utilization(memory_mb, cpu_percent);
+        self.atomic_metrics
+            .update_resource_utilization(memory_mb, cpu_percent);
     }
 
     /// Record a difficulty adjustment event.
@@ -468,11 +497,12 @@ impl MetricsService {
 
     /// Record a job distribution latency event.
     pub fn record_job_distribution_latency_event(&self, latency_ms: f64) {
-        self.atomic_metrics.record_job_distribution_latency(latency_ms);
+        self.atomic_metrics
+            .record_job_distribution_latency(latency_ms);
     }
 
     // ===== MINING-SPECIFIC EVENT RECORDING METHODS =====
-    
+
     /// Record connection established event with duration.
     pub fn record_connection_established_event(&self, duration_ms: f64) {
         self.atomic_metrics.record_connection_duration(duration_ms);
@@ -485,57 +515,77 @@ impl MetricsService {
 
     /// Update idle time gauge.
     pub fn update_idle_time(&self, idle_time_ms: f64) {
-        self.atomic_metrics.store_f64(&self.atomic_metrics.idle_time_gauge_ms_bits, idle_time_ms);
+        self.atomic_metrics
+            .store_f64(&self.atomic_metrics.idle_time_gauge_ms_bits, idle_time_ms);
     }
 
     /// Record HTTP request event.
     pub fn record_http_request_event(&self) {
-        self.atomic_metrics.http_requests_total.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.atomic_metrics
+            .http_requests_total
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// Record Stratum request event.
     pub fn record_stratum_request_event(&self) {
-        self.atomic_metrics.stratum_requests_total.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.atomic_metrics
+            .stratum_requests_total
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// Record protocol detection success event.
     pub fn record_protocol_detection_success_event(&self) {
-        self.atomic_metrics.protocol_detection_successes.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.atomic_metrics
+            .protocol_detection_successes
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// Record protocol detection failure event.
     pub fn record_protocol_detection_failure_event(&self) {
-        self.atomic_metrics.protocol_detection_failures.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.atomic_metrics
+            .protocol_detection_failures
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// Record HTTP CONNECT request event.
     pub fn record_http_connect_request_event(&self) {
-        self.atomic_metrics.http_connect_requests.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.atomic_metrics
+            .http_connect_requests
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// Record direct Stratum connection event.
     pub fn record_direct_stratum_connection_event(&self) {
-        self.atomic_metrics.direct_stratum_connections.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.atomic_metrics
+            .direct_stratum_connections
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// Record protocol conversion success event with rate.
     pub fn record_protocol_conversion_success_event(&self, success_rate: f64) {
-        self.atomic_metrics.record_protocol_conversion_success(success_rate);
+        self.atomic_metrics
+            .record_protocol_conversion_success(success_rate);
     }
 
     /// Record protocol conversion error event.
     pub fn record_protocol_conversion_error_event(&self) {
-        self.atomic_metrics.protocol_conversion_errors.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.atomic_metrics
+            .protocol_conversion_errors
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// Record share submission event.
     pub fn record_share_submission_event(&self) {
-        self.atomic_metrics.share_submissions_total.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.atomic_metrics
+            .share_submissions_total
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// Record duplicate share event.
     pub fn record_duplicate_share_event(&self) {
-        self.atomic_metrics.duplicate_shares_counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.atomic_metrics
+            .duplicate_shares_counter
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// Record stale share event.
@@ -563,7 +613,10 @@ impl MetricsService {
     /// Get all user metrics.
     pub fn get_all_user_metrics(&self) -> Vec<super::UserMetricsSnapshot> {
         let users = self.user_metrics.get_all_users();
-        users.iter().map(|user_id| self.user_metrics.get_user_snapshot(user_id)).collect()
+        users
+            .iter()
+            .map(|user_id| self.user_metrics.get_user_snapshot(user_id))
+            .collect()
     }
 
     /// Record a categorized error event by type.
@@ -576,7 +629,9 @@ impl MetricsService {
             "security" => self.atomic_metrics.record_security_violation(),
             _ => {
                 // Generic internal error
-                self.atomic_metrics.internal_errors_total.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                self.atomic_metrics
+                    .internal_errors_total
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             }
         }
     }
@@ -587,27 +642,43 @@ impl MetricsService {
         // We can extend this later with more specific tracking if needed
         self.atomic_metrics.increment_connection();
     }
+
+    /// Get current hashrate estimate in H/s.
+    pub fn get_hashrate_estimate(&self) -> f64 {
+        self.atomic_metrics.get_hashrate_estimate()
+    }
+
+    /// Manually trigger hashrate calculation.
+    pub fn calculate_hashrate(&self) {
+        let time_window_secs = self.config.hashrate_time_window.as_secs_f64();
+        self.atomic_metrics
+            .calculate_and_update_hashrate(time_window_secs);
+    }
 }
 
 /// Lightweight background service struct for tokio tasks.
 #[derive(Debug, Clone)]
 struct MetricsServiceBackground {
     atomic_metrics: Arc<AtomicMetrics>,
+    #[allow(dead_code)]
     user_metrics: Arc<UserMetrics>,
+    #[allow(dead_code)]
     database_metrics: Arc<RwLock<DatabaseMetrics>>,
     time_series: Arc<RwLock<TimeSeriesMetrics>>,
     config: MetricsConfig,
     database_service: Option<Arc<DatabaseService>>,
+    #[allow(dead_code)]
     resource_monitor: Option<Arc<ResourceMonitor>>,
 }
 
+#[allow(dead_code)]
 impl MetricsServiceBackground {
     async fn run_snapshot_collection(&self) {
         let mut interval = interval(self.config.snapshot_interval);
-        
+
         loop {
             interval.tick().await;
-            
+
             match self.capture_and_store_snapshot().await {
                 Ok(_) => {
                     debug!("Captured metrics snapshot");
@@ -619,7 +690,9 @@ impl MetricsServiceBackground {
         }
     }
 
-    async fn capture_and_store_snapshot(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    async fn capture_and_store_snapshot(
+        &self,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let snapshot = self.atomic_metrics.snapshot();
         let mut ts = self.time_series.write().await;
 
@@ -637,17 +710,19 @@ impl MetricsServiceBackground {
         }
 
         let mut interval = interval(Duration::from_secs(300));
-        
+
         loop {
             interval.tick().await;
-            
+
             if let Err(e) = self.persist_metrics_to_database().await {
                 error!("Failed to persist metrics to database: {}", e);
             }
         }
     }
 
-    async fn persist_metrics_to_database(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    async fn persist_metrics_to_database(
+        &self,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         if let Some(_db_service) = &self.database_service {
             let _snapshot = self.atomic_metrics.snapshot();
             // Database persistence implementation
@@ -656,8 +731,37 @@ impl MetricsServiceBackground {
         Ok(())
     }
 
+    /// Run periodic hashrate calculation.
+    async fn run_hashrate_calculation(&self) {
+        let mut interval = interval(self.config.hashrate_calculation_interval);
+        let time_window_secs = self.config.hashrate_time_window.as_secs_f64();
+
+        info!(
+            "Starting hashrate calculation with {:.0}s intervals and {:.0}s windows",
+            self.config.hashrate_calculation_interval.as_secs_f64(),
+            time_window_secs
+        );
+
+        loop {
+            interval.tick().await;
+
+            // Calculate hashrate
+            self.atomic_metrics
+                .calculate_and_update_hashrate(time_window_secs);
+
+            let current_hashrate = self.atomic_metrics.get_hashrate_estimate();
+            if current_hashrate > 0.0 {
+                debug!(
+                    "Calculated hashrate: {:.2} H/s ({:.2} MH/s)",
+                    current_hashrate,
+                    current_hashrate / 1_000_000.0
+                );
+            }
+        }
+    }
+
     // Delegate methods to atomic metrics for common operations
-    
+
     /// Record a new connection.
     pub fn record_connection(&self) {
         self.atomic_metrics.increment_connection();
@@ -760,11 +864,12 @@ impl MetricsServiceBackground {
 
     /// Update resource utilization.
     pub fn update_resource_utilization(&self, memory_mb: f64, cpu_percent: f64) {
-        self.atomic_metrics.update_resource_utilization(memory_mb, cpu_percent);
+        self.atomic_metrics
+            .update_resource_utilization(memory_mb, cpu_percent);
     }
 
     // Mining-specific event recording methods
-    
+
     /// Record connection established event with duration.
     pub fn record_connection_established_event(&self, duration_ms: f64) {
         self.atomic_metrics.record_connection_duration(duration_ms);
@@ -777,57 +882,77 @@ impl MetricsServiceBackground {
 
     /// Update idle time gauge.
     pub fn update_idle_time(&self, idle_time_ms: f64) {
-        self.atomic_metrics.store_f64(&self.atomic_metrics.idle_time_gauge_ms_bits, idle_time_ms);
+        self.atomic_metrics
+            .store_f64(&self.atomic_metrics.idle_time_gauge_ms_bits, idle_time_ms);
     }
 
     /// Record HTTP request event.
     pub fn record_http_request_event(&self) {
-        self.atomic_metrics.http_requests_total.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.atomic_metrics
+            .http_requests_total
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// Record Stratum request event.
     pub fn record_stratum_request_event(&self) {
-        self.atomic_metrics.stratum_requests_total.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.atomic_metrics
+            .stratum_requests_total
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// Record protocol detection success event.
     pub fn record_protocol_detection_success_event(&self) {
-        self.atomic_metrics.protocol_detection_successes.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.atomic_metrics
+            .protocol_detection_successes
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// Record protocol detection failure event.
     pub fn record_protocol_detection_failure_event(&self) {
-        self.atomic_metrics.protocol_detection_failures.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.atomic_metrics
+            .protocol_detection_failures
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// Record HTTP CONNECT request event.
     pub fn record_http_connect_request_event(&self) {
-        self.atomic_metrics.http_connect_requests.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.atomic_metrics
+            .http_connect_requests
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// Record direct Stratum connection event.
     pub fn record_direct_stratum_connection_event(&self) {
-        self.atomic_metrics.direct_stratum_connections.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.atomic_metrics
+            .direct_stratum_connections
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// Record protocol conversion success event with rate.
     pub fn record_protocol_conversion_success_event(&self, success_rate: f64) {
-        self.atomic_metrics.record_protocol_conversion_success(success_rate);
+        self.atomic_metrics
+            .record_protocol_conversion_success(success_rate);
     }
 
     /// Record protocol conversion error event.
     pub fn record_protocol_conversion_error_event(&self) {
-        self.atomic_metrics.protocol_conversion_errors.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.atomic_metrics
+            .protocol_conversion_errors
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// Record share submission event.
     pub fn record_share_submission_event(&self) {
-        self.atomic_metrics.share_submissions_total.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.atomic_metrics
+            .share_submissions_total
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// Record duplicate share event.
     pub fn record_duplicate_share_event(&self) {
-        self.atomic_metrics.duplicate_shares_counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.atomic_metrics
+            .duplicate_shares_counter
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// Record stale share event.
@@ -855,7 +980,10 @@ impl MetricsServiceBackground {
     /// Get all user metrics.
     pub fn get_all_user_metrics(&self) -> Vec<super::UserMetricsSnapshot> {
         let users = self.user_metrics.get_all_users();
-        users.iter().map(|user_id| self.user_metrics.get_user_snapshot(user_id)).collect()
+        users
+            .iter()
+            .map(|user_id| self.user_metrics.get_user_snapshot(user_id))
+            .collect()
     }
 
     /// Record a categorized error event by type.
@@ -868,7 +996,9 @@ impl MetricsServiceBackground {
             "security" => self.atomic_metrics.record_security_violation(),
             _ => {
                 // Generic internal error
-                self.atomic_metrics.internal_errors_total.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                self.atomic_metrics
+                    .internal_errors_total
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             }
         }
     }

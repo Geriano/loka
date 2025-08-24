@@ -46,18 +46,27 @@ impl HashUtils {
         MAX_TARGET_APPROX as f64 / target_num as f64
     }
 
-    /// Fast hash rate calculation (optimized for integer arithmetic)
-    pub fn calculate_hash_rate_optimized(shares: u64, time_seconds: u64, difficulty: f64) -> u64 {
-        if time_seconds == 0 {
-            return 0;
+    /// Calculate hashrate using Bitcoin mining standard formula
+    /// Formula: Hashrate = (Shares × Difficulty × 2^32) / Time_Window_Seconds
+    /// Returns hashrate in H/s (hashes per second)
+    pub fn calculate_hashrate_bitcoin_standard(shares: u64, time_window_seconds: u64, difficulty: f64) -> f64 {
+        if time_window_seconds == 0 || shares == 0 {
+            return 0.0;
         }
 
-        // Convert difficulty to integer arithmetic to avoid floating point
-        let difficulty_int = (difficulty * 1000.0) as u64; // Scale by 1000 for precision
-        let hashes_per_share = (difficulty_int * 4_294_967_296) / 1000; // 2^32 scaled
+        // Bitcoin standard: Each share represents difficulty * 2^32 hashes
+        const HASHES_PER_SHARE_UNIT: f64 = 4_294_967_296.0; // 2^32
+        
+        let hashes_per_share = difficulty * HASHES_PER_SHARE_UNIT;
+        let total_hashes = shares as f64 * hashes_per_share;
+        
+        total_hashes / time_window_seconds as f64
+    }
 
-        let total_hashes = shares * hashes_per_share;
-        total_hashes / time_seconds
+    /// Fast hash rate calculation (optimized for integer arithmetic)
+    /// This is a legacy function maintained for compatibility
+    pub fn calculate_hash_rate_optimized(shares: u64, time_seconds: u64, difficulty: f64) -> u64 {
+        Self::calculate_hashrate_bitcoin_standard(shares, time_seconds, difficulty) as u64
     }
 
     /// Combine multiple hashes efficiently
@@ -151,7 +160,7 @@ impl RollingHash {
             self.buffer.rotate_left(1);
             self.buffer[self.window_size - 1] = byte;
 
-            self.hash = self.hash - (old_byte as u64 * self.power);
+            self.hash -= old_byte as u64 * self.power;
             self.hash = self.hash * self.base + byte as u64;
         }
 
@@ -182,7 +191,7 @@ impl SimpleBloomFilter {
             as usize;
         let hash_functions = ((size as f64 / capacity as f64) * 2.0_f64.ln()).ceil() as u8;
 
-        let num_words = (size + 63) / 64; // Round up to word boundary
+        let num_words = size.div_ceil(64); // Round up to word boundary
 
         Self {
             bits: vec![0u64; num_words],
@@ -260,7 +269,26 @@ mod tests {
     }
 
     #[test]
-    fn test_hash_rate_calculation() {
+    fn test_bitcoin_hashrate_calculation() {
+        // Test case: 10 shares in 60 seconds at difficulty 1.0
+        let hashrate = HashUtils::calculate_hashrate_bitcoin_standard(10, 60, 1.0);
+        
+        // Expected: (10 × 1.0 × 2^32) / 60 = 715,827,882.67 H/s
+        let expected = (10.0 * 1.0 * 4_294_967_296.0) / 60.0;
+        assert!((hashrate - expected).abs() < 1.0, "Expected: {}, Got: {}", expected, hashrate);
+        
+        // Test edge cases
+        assert_eq!(HashUtils::calculate_hashrate_bitcoin_standard(0, 60, 1.0), 0.0);
+        assert_eq!(HashUtils::calculate_hashrate_bitcoin_standard(10, 0, 1.0), 0.0);
+        
+        // Test higher difficulty
+        let high_diff_hashrate = HashUtils::calculate_hashrate_bitcoin_standard(5, 30, 1000.0);
+        let expected_high = (5.0 * 1000.0 * 4_294_967_296.0) / 30.0;
+        assert!((high_diff_hashrate - expected_high).abs() < 1.0);
+    }
+
+    #[test] 
+    fn test_hash_rate_calculation_legacy() {
         let hash_rate = HashUtils::calculate_hash_rate_optimized(10, 60, 1.0);
         assert!(hash_rate > 0);
     }

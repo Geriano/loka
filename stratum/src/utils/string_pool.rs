@@ -397,7 +397,7 @@ impl StringOptimizer {
     /// Parse JSON field efficiently for common Stratum fields
     pub fn extract_json_field<'a>(json: &'a str, field: &str) -> Option<&'a str> {
         // Simple JSON field extraction for performance-critical paths
-        let field_pattern = format!("\"{}\":", field);
+        let field_pattern = format!("\"{field}\":");
         if let Some(start) = json.find(&field_pattern) {
             let value_start = start + field_pattern.len();
             let json_after_field = &json[value_start..];

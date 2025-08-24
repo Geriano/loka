@@ -96,12 +96,11 @@ fn test_value(histogram: &Histogram, value: f64, description: &str) {
     let slot_range_start = slot as f64 * (upper - lower) / 12.0 + lower;
     let slot_range_end = (slot + 1) as f64 * (upper - lower) / 12.0 + lower;
 
-    println!("  {}: ", description);
-    println!("    Original value: {:.1}", original_value);
-    println!("    Clamped value: {:.1}", clamped);
+    println!("  {description}: ");
+    println!("    Original value: {original_value:.1}");
+    println!("    Clamped value: {clamped:.1}");
     println!(
-        "    Goes to slot: {} [{:.1}, {:.1})",
-        slot, slot_range_start, slot_range_end
+        "    Goes to slot: {slot} [{slot_range_start:.1}, {slot_range_end:.1})"
     );
 
     if original_value != clamped {

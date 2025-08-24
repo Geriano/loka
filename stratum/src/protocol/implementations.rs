@@ -43,7 +43,7 @@ impl MessageParser for DefaultMessageParser {
 
     async fn serialize(&self, message: &StratumMessage) -> Result<String> {
         serde_json::to_string(message).map_err(|e| StratumError::Protocol {
-            message: format!("Failed to serialize message: {}", e),
+            message: format!("Failed to serialize message: {e}"),
             method: None,
             request_id: None,
         })
@@ -228,7 +228,7 @@ impl InMemorySessionManager {
 
     fn generate_session_id(&self) -> String {
         let counter = self.session_counter.fetch_add(1, Ordering::Relaxed);
-        format!("session_{}", counter)
+        format!("session_{counter}")
     }
 }
 
@@ -265,7 +265,7 @@ impl SessionManager for InMemorySessionManager {
             Ok(())
         } else {
             Err(StratumError::Protocol {
-                message: format!("Session not found: {}", session_id),
+                message: format!("Session not found: {session_id}"),
                 method: None,
                 request_id: None,
             })
@@ -305,7 +305,7 @@ impl SessionManager for InMemorySessionManager {
             Ok(())
         } else {
             Err(StratumError::Protocol {
-                message: format!("Session not found: {}", session_id),
+                message: format!("Session not found: {session_id}"),
                 method: None,
                 request_id: None,
             })

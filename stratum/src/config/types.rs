@@ -134,7 +134,7 @@ impl Config {
                 message: "No active pool configuration found in database".to_string(),
             }),
             Err(e) => Err(crate::error::StratumError::Internal {
-                message: format!("Failed to load pool configuration from database: {}", e),
+                message: format!("Failed to load pool configuration from database: {e}"),
             }),
         }
     }
@@ -143,11 +143,11 @@ impl Config {
     pub fn load_from_file<P: AsRef<std::path::Path>>(path: P) -> crate::Result<Self> {
         let content =
             std::fs::read_to_string(path).map_err(|e| crate::error::StratumError::Internal {
-                message: format!("Failed to read config file: {}", e),
+                message: format!("Failed to read config file: {e}"),
             })?;
         let config: Config =
             toml::from_str(&content).map_err(|e| crate::error::StratumError::Internal {
-                message: format!("Failed to parse config: {}", e),
+                message: format!("Failed to parse config: {e}"),
             })?;
         Ok(config)
     }

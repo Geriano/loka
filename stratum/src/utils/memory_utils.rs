@@ -9,6 +9,12 @@ pub struct MemoryTracker {
     allocation_count: AtomicU64,
 }
 
+impl Default for MemoryTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MemoryTracker {
     pub const fn new() -> Self {
         Self {
@@ -260,7 +266,7 @@ impl MemoryUtils {
 
     /// Calculate the size of a slice in bytes
     pub fn size_of_slice<T>(slice: &[T]) -> usize {
-        slice.len() * mem::size_of::<T>()
+        std::mem::size_of_val(slice)
     }
 
     /// Get the memory usage of a String
@@ -438,7 +444,7 @@ mod tests {
 
     #[test]
     fn test_object_pool() {
-        let pool = ObjectPool::with_reset(|| Vec::<i32>::new(), |vec| vec.clear(), 5);
+        let pool = ObjectPool::with_reset(Vec::<i32>::new, |vec| vec.clear(), 5);
 
         let mut obj1 = pool.get();
         obj1.push(42);

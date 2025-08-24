@@ -168,7 +168,7 @@ impl StratumHandler {
                 if let Some(params) = obj.get_mut("params") {
                     if let Some(params_array) = params.as_array_mut() {
                         // Extract original username first
-                        let original_username = params_array.get(0)
+                        let original_username = params_array.first()
                             .and_then(|v| v.as_str())
                             .map(|s| s.to_string());
                         
@@ -247,10 +247,7 @@ impl StratumHandler {
     /// Helper method to parse raw JSON messages while preserving structure
     /// for forwarding to upstream pools.
     fn parse_raw_json(&self, raw_message: &str) -> Option<Value> {
-        match serde_json::from_str::<Value>(raw_message.trim()) {
-            Ok(value) => Some(value),
-            Err(_) => None,
-        }
+        serde_json::from_str::<Value>(raw_message.trim()).ok()
     }
 
 }

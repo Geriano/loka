@@ -260,9 +260,9 @@ impl MonitoringService {
                     if op_stats.p99 > Duration::from_millis(1000) {
                         // 1 second threshold
                         let alert = Alert {
-                            id: format!("slow_operation_{}", operation),
+                            id: format!("slow_operation_{operation}"),
                             rule_id: "performance_slow_operation".to_string(),
-                            title: format!("Slow Operation: {}", operation),
+                            title: format!("Slow Operation: {operation}"),
                             description: format!(
                                 "Operation '{}' has P99 latency of {:?}",
                                 operation, op_stats.p99
@@ -462,7 +462,7 @@ impl MonitoringService {
         if total_messages > 0 {
             let error_rate = (total_errors as f64 / total_messages as f64) * 100.0;
             if error_rate > 10.0 {
-                issues.push(format!("High error rate: {:.1}%", error_rate));
+                issues.push(format!("High error rate: {error_rate:.1}%"));
             }
         }
 

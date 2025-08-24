@@ -8,8 +8,7 @@ use crate::config::SentryConfig;
 /// Initialize Sentry with configuration from environment variables or config
 pub fn init_sentry(config: Option<&SentryConfig>) -> Result<Option<sentry::ClientInitGuard>> {
     // Try to get DSN from config first, then environment variable
-    let dsn = config
-        .and_then(|c| Some(c.dsn.clone()))
+    let dsn = config.map(|c| c.dsn.clone())
         .or_else(|| env::var("SENTRY_DSN").ok())
         .filter(|dsn| !dsn.is_empty());
 
@@ -163,7 +162,7 @@ pub fn capture_mining_error(error: &anyhow::Error, operation: &str, pool_id: Opt
     });
 
     // Capture anyhow error by converting to message
-    let error_msg = format!("{:#}", error);
+    let error_msg = format!("{error:#}");
     sentry::capture_message(&error_msg, sentry::Level::Error);
 }
 

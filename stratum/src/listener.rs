@@ -1,7 +1,6 @@
 use std::sync::Arc;
 use std::time::Instant;
 use tokio::net::{TcpListener, TcpStream};
-use tracing;
 
 use crate::handler::Handler;
 use crate::services::database::DatabaseService;

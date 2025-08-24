@@ -110,9 +110,9 @@ impl RateLimitingMiddleware {
 
     fn get_client_key(&self, context: &MessageContext) -> String {
         if let Some(ref client_id) = context.client_id {
-            format!("client:{}", client_id)
+            format!("client:{client_id}")
         } else if let Some(client_ip) = context.client_ip {
-            format!("ip:{}", client_ip)
+            format!("ip:{client_ip}")
         } else {
             "unknown".to_string()
         }
@@ -195,7 +195,7 @@ impl AuthenticationMiddleware {
         let (from_separator, to_separator) = &self.pool_config.separator;
 
         // Combine user and worker to create the full miner identifier
-        let full_miner_username = format!("{}.{}", user, worker);
+        let full_miner_username = format!("{user}.{worker}");
 
         // Transform the miner username: replace dots with underscores (or configured separator)
         let transformed_worker = full_miner_username.replace(from_separator, to_separator);
@@ -211,7 +211,7 @@ impl Middleware for AuthenticationMiddleware {
         if let Some(ref message) = context.parsed_message {
             match message {
                 StratumMessage::Authenticate { user, worker, .. } => {
-                    let client_key = format!("{}:{}", user, worker);
+                    let client_key = format!("{user}:{worker}");
                     let user_clone = user.clone();
                     let worker_clone = worker.clone();
 

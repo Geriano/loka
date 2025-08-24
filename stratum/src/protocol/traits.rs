@@ -193,6 +193,12 @@ pub struct ProtocolMetricsSnapshot {
     pub timestamp: chrono::DateTime<chrono::Utc>,
 }
 
+impl Default for ProtocolMetricsSnapshot {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ProtocolMetricsSnapshot {
     pub fn new() -> Self {
         Self {

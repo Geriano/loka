@@ -6,8 +6,7 @@
 // - Taproot addresses (P2TR)
 // - Worker name format validation (address.worker_name)
 
-use std::str::FromStr;
-use tracing::{debug, warn};
+use tracing::debug;
 
 /// Bitcoin address validation result
 #[derive(Debug, Clone, PartialEq)]
@@ -77,13 +76,13 @@ impl BitcoinAddressValidator {
                         };
                     } else {
                         return AddressValidationResult::Invalid {
-                            reason: format!("Invalid worker name: {}", worker_part),
+                            reason: format!("Invalid worker name: {worker_part}"),
                         };
                     }
                 }
                 AddressValidationResult::Invalid { reason } => {
                     return AddressValidationResult::Invalid {
-                        reason: format!("Invalid Bitcoin address in worker format: {}", reason),
+                        reason: format!("Invalid Bitcoin address in worker format: {reason}"),
                     };
                 }
                 _ => unreachable!(),
@@ -186,7 +185,7 @@ impl BitcoinAddressValidator {
         
         for ch in address.chars() {
             if !BASE58_CHARS.contains(ch) {
-                return Err(format!("Invalid Base58 character: {}", ch));
+                return Err(format!("Invalid Base58 character: {ch}"));
             }
         }
 
@@ -213,13 +212,13 @@ impl BitcoinAddressValidator {
 
             // Validate HRP
             if hrp != "bc" && hrp != "tb" {
-                return Err(format!("Invalid Bech32 HRP: {}", hrp));
+                return Err(format!("Invalid Bech32 HRP: {hrp}"));
             }
 
             // Validate data part characters
             for ch in data.chars() {
                 if !BECH32_CHARS.contains(ch) {
-                    return Err(format!("Invalid Bech32 character: {}", ch));
+                    return Err(format!("Invalid Bech32 character: {ch}"));
                 }
             }
 
@@ -256,7 +255,7 @@ impl BitcoinAddressValidator {
                 format!("Valid worker format with {} address", self.describe_address_type(address_type))
             }
             AddressValidationResult::Invalid { reason } => {
-                format!("Invalid: {}", reason)
+                format!("Invalid: {reason}")
             }
         }
     }

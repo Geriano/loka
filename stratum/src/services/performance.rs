@@ -134,7 +134,7 @@ impl ResourceMonitor {
         };
 
         // Get history for calculations
-        let cpu_avg = self.get_average_cpu_usage().await;
+        let _cpu_avg = self.get_average_cpu_usage().await;
         let cpu_history = self.cpu_usage_history.read().await;
         let memory_history = self.memory_usage_history.read().await;
 
@@ -196,7 +196,7 @@ impl PerformanceProfiler {
         let mut operation_times = self
             .operation_times
             .entry(operation.to_string())
-            .or_insert_with(Vec::new);
+            .or_default();
 
         operation_times.push(duration);
         if operation_times.len() > self.max_samples {
@@ -325,7 +325,7 @@ impl OperationTimer {
         let mut operation_times = self
             .times_store
             .entry(self.operation.clone())
-            .or_insert_with(Vec::new);
+            .or_default();
 
         operation_times.push(duration);
         if operation_times.len() > self.max_samples {

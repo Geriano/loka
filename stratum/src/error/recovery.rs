@@ -424,18 +424,15 @@ impl RecoveryManager {
             current_context.attempt_count += 1;
 
             // Check circuit breaker
-            match circuit_breaker.can_execute() {
-                Err(circuit_error) => {
-                    warn!("Circuit breaker preventing execution: {}", circuit_error);
+            if let Err(circuit_error) = circuit_breaker.can_execute() {
+                warn!("Circuit breaker preventing execution: {}", circuit_error);
 
-                    // Update statistics
-                    self.statistics
-                        .circuit_breaker_activations
-                        .fetch_add(1, Ordering::Relaxed);
+                // Update statistics
+                self.statistics
+                    .circuit_breaker_activations
+                    .fetch_add(1, Ordering::Relaxed);
 
-                    return Err(circuit_error);
-                }
-                Ok(()) => {}
+                return Err(circuit_error);
             }
 
             // Check if we've exceeded total time budget

@@ -366,7 +366,7 @@ impl BidirectionalProxy {
 
                 let message_str =
                     serde_json::to_string(&message).unwrap_or_else(|_| "{}".to_string());
-                let message_line = format!("{}\n", message_str);
+                let message_line = format!("{message_str}\n");
 
                 trace!(
                     "Connection {} - Sending message #{} to client",
@@ -421,7 +421,7 @@ impl BidirectionalProxy {
 
                 let message_str =
                     serde_json::to_string(&message).unwrap_or_else(|_| "{}".to_string());
-                let message_line = format!("{}\n", message_str);
+                let message_line = format!("{message_str}\n");
 
                 trace!(
                     "Connection {} - Sending message #{} to server",

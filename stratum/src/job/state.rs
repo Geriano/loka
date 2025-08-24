@@ -15,7 +15,9 @@ impl State {
     }
 
     pub fn hashes(&self) -> u64 {
-        (self.difficulty * 2.0f64.powf(32.0f64)) as u64 * self.elapsed().as_secs()
+        // Each share represents difficulty * 2^32 hashes according to Bitcoin standard
+        // This is NOT time-based - each share submission represents a fixed amount of work
+        (self.difficulty * 2.0f64.powf(32.0f64)) as u64
     }
 
     pub fn elapsed(&self) -> Duration {

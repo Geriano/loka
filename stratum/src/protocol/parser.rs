@@ -30,8 +30,7 @@ impl StratumParser {
     fn handle_subscribe(&self, request: Request) -> Result<StratumMessage> {
         let user_agent = if let Some(params) = request.params {
             if let Some(params) = params.as_array() {
-                params
-                    .get(0)
+                params.first()
                     .and_then(|param| param.as_str())
                     .map(|s| s.to_string())
             } else {
@@ -50,7 +49,7 @@ impl StratumParser {
     fn handle_set_difficulty(&self, request: Request) -> Result<StratumMessage> {
         if let Some(params) = request.params {
             if let Some(params) = params.as_array() {
-                if let Some(Some(difficulty)) = params.get(0).map(|param| param.as_f64()) {
+                if let Some(Some(difficulty)) = params.first().map(|param| param.as_f64()) {
                     return Ok(StratumMessage::SetDifficulty { difficulty });
                 }
             }
@@ -72,7 +71,7 @@ impl StratumParser {
                     password = Some(p.trim().to_owned());
                 }
 
-                if let Some(Some(cred)) = params.get(0).map(|param| param.as_str()) {
+                if let Some(Some(cred)) = params.first().map(|param| param.as_str()) {
                     let (user, worker) = self.parse_credentials(cred)?;
 
                     return Ok(StratumMessage::Authenticate {
@@ -95,7 +94,7 @@ impl StratumParser {
     fn handle_notify(&self, request: Request) -> Result<StratumMessage> {
         if let Some(params) = request.params {
             if let Some(params) = params.as_array() {
-                if let Some(Some(job_id)) = params.get(0).map(|param| param.as_str()) {
+                if let Some(Some(job_id)) = params.first().map(|param| param.as_str()) {
                     return Ok(StratumMessage::Notify {
                         job_id: job_id.to_owned(),
                     });

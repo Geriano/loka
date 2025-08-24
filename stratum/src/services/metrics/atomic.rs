@@ -120,9 +120,17 @@ pub struct AtomicMetrics {
     /// Number of active goroutines/tasks
     pub goroutine_count: AtomicU64,
 
-    // === BUSINESS METRICS ===
+    // === HASHRATE CALCULATION METRICS ===
     /// Estimated network hashrate (stored as f64 bits)
     pub hashrate_estimate_bits: AtomicU64,
+    /// Hashrate calculation window start timestamp (stored as f64 bits)
+    pub hashrate_window_start_timestamp_bits: AtomicU64,
+    /// Share count at window start for hashrate calculation
+    pub hashrate_window_start_shares: AtomicU64,
+    /// Current difficulty for hashrate calculation (stored as f64 bits) 
+    pub hashrate_current_difficulty_bits: AtomicU64,
+
+    // === BUSINESS METRICS ===
     /// Number of difficulty adjustments
     pub difficulty_adjustments: AtomicU64,
     /// Number of pool switches
@@ -294,8 +302,13 @@ impl AtomicMetrics {
             cpu_usage_percent_bits: AtomicU64::new((0.0_f64).to_bits()),
             goroutine_count: AtomicU64::new(0),
 
-            // Business/mining metrics
+            // Hashrate calculation metrics
             hashrate_estimate_bits: AtomicU64::new((0.0_f64).to_bits()),
+            hashrate_window_start_timestamp_bits: AtomicU64::new((0.0_f64).to_bits()),
+            hashrate_window_start_shares: AtomicU64::new(0),
+            hashrate_current_difficulty_bits: AtomicU64::new((1.0_f64).to_bits()),
+
+            // Business metrics
             difficulty_adjustments: AtomicU64::new(0),
             pool_switches: AtomicU64::new(0),
 
@@ -614,6 +627,7 @@ impl AtomicMetrics {
     #[inline]
     pub fn update_difficulty(&self, difficulty: f64) {
         self.store_f64(&self.current_difficulty_bits, difficulty);
+        self.update_hashrate_difficulty(difficulty); // Also update hashrate calculation difficulty
         self.difficulty_adjustments.fetch_add(1, Ordering::Relaxed);
         self.difficulty_adjustments_counter.fetch_add(1, Ordering::Relaxed);
     }
@@ -729,6 +743,59 @@ impl AtomicMetrics {
         let sum = self.load_f64(&self.job_distribution_latency_sum_ms_bits);
         let count = self.job_distribution_latency_count.load(Ordering::Relaxed);
         if count > 0 { sum / count as f64 } else { 0.0 }
+    }
+
+    /// Calculate and update hashrate estimate using Bitcoin standard formula.
+    /// Should be called periodically (e.g., every 60 seconds) to update hashrate.
+    #[inline]
+    pub fn calculate_and_update_hashrate(&self, time_window_seconds: f64) {
+        use crate::utils::hash_utils::HashUtils;
+        use std::time::{SystemTime, UNIX_EPOCH};
+        
+        let current_timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs_f64();
+            
+        let window_start = self.load_f64(&self.hashrate_window_start_timestamp_bits);
+        let current_shares = self.share_submissions_total.load(Ordering::Relaxed);
+        let window_start_shares = self.hashrate_window_start_shares.load(Ordering::Relaxed);
+        let difficulty = self.load_f64(&self.hashrate_current_difficulty_bits);
+        
+        // Initialize window if not set or if enough time has passed
+        if window_start == 0.0 || (current_timestamp - window_start) >= time_window_seconds {
+            // Calculate hashrate for the completed window
+            if window_start > 0.0 && current_shares > window_start_shares {
+                let shares_in_window = current_shares - window_start_shares;
+                let actual_time_window = current_timestamp - window_start;
+                
+                if actual_time_window > 0.0 {
+                    let hashrate = HashUtils::calculate_hashrate_bitcoin_standard(
+                        shares_in_window,
+                        actual_time_window as u64,
+                        difficulty
+                    );
+                    
+                    self.store_f64(&self.hashrate_estimate_bits, hashrate);
+                }
+            }
+            
+            // Reset window
+            self.store_f64(&self.hashrate_window_start_timestamp_bits, current_timestamp);
+            self.hashrate_window_start_shares.store(current_shares, Ordering::Relaxed);
+        }
+    }
+    
+    /// Update difficulty for hashrate calculations
+    #[inline]
+    pub fn update_hashrate_difficulty(&self, difficulty: f64) {
+        self.store_f64(&self.hashrate_current_difficulty_bits, difficulty);
+    }
+    
+    /// Get current hashrate estimate
+    #[inline]
+    pub fn get_hashrate_estimate(&self) -> f64 {
+        self.load_f64(&self.hashrate_estimate_bits)
     }
 
     /// Create a snapshot of all current metrics.
