@@ -50,7 +50,7 @@ jobs:
 
       - name: Check for outdated dependencies
         run: |
-          cargo install cargo-outdated || true
+          cargo install cargo-outdated --force || true
           cargo outdated --exit-code 1 || echo "Some dependencies are outdated"
 
   # Job 2: Security Scanning
@@ -139,7 +139,7 @@ jobs:
             ${{ runner.os }}-cargo-
 
       - name: Install sea-orm-cli
-        run: cargo install sea-orm-cli --locked
+        run: cargo install sea-orm-cli --locked || true
 
       - name: Setup test database
         env:

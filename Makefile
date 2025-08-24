@@ -33,9 +33,9 @@ setup: ## Setup development environment
 	@echo "$(BLUE)Setting up development environment...$(NC)"
 	rustup update $(RUST_VERSION)
 	rustup component add rustfmt clippy
-	$(CARGO) install sea-orm-cli --locked
-	$(CARGO) install cargo-audit --locked
-	$(CARGO) install cargo-outdated --locked
+	$(CARGO) install sea-orm-cli --locked --force
+	$(CARGO) install cargo-audit --locked --force
+	$(CARGO) install cargo-outdated --locked --force
 	@echo "$(GREEN)✅ Development environment setup complete$(NC)"
 
 build: ## Build all workspace crates
