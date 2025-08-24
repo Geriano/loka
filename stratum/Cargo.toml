@@ -10,8 +10,6 @@ path = "bin/main.rs"
 
 [features]
 default = []
-mock-pool = ["rand", "hex"]
-mock-miner = ["rand", "hex"]
 
 [dependencies]
 anyhow = { workspace = true }
@@ -42,6 +40,9 @@ sysinfo = { workspace = true }
 sea-orm = { workspace = true }
 rand = { workspace = true, optional = true }
 hex = { workspace = true, optional = true }
+sentry = { workspace = true }
+sentry-tracing = { workspace = true }
+sentry-tower = { workspace = true }
 
 [dependencies.loka-metrics]
 workspace = true

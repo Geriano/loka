@@ -216,111 +216,21 @@ impl StratumProtocolValidator {
     }
 
     fn validate_method(&self, method: &str, params: &Value) -> Result<()> {
-        match method {
-            "mining.authorize" => {
-                let params = params
-                    .as_array()
-                    .ok_or_else(|| StratumError::ValidationFailed {
-                        field: "params".to_string(),
-                        message: "mining.authorize params must be an array".to_string(),
-                        value: Some(params.to_string()),
-                    })?;
-
-                if params.len() != 2 {
-                    return Err(StratumError::ValidationFailed {
-                        field: "params".to_string(),
-                        message: "mining.authorize requires exactly 2 parameters".to_string(),
-                        value: Some(format!("got {} parameters", params.len())),
-                    });
-                }
-
-                // Validate username format
-                let username =
-                    params[0]
-                        .as_str()
-                        .ok_or_else(|| StratumError::ValidationFailed {
-                            field: "params[0]".to_string(),
-                            message: "Username must be a string".to_string(),
-                            value: Some(params[0].to_string()),
-                        })?;
-
-                if username.is_empty() || username.len() > 100 {
-                    return Err(StratumError::ValidationFailed {
-                        field: "username".to_string(),
-                        message: "Username must be between 1-100 characters".to_string(),
-                        value: Some(username.to_string()),
-                    });
-                }
-
-                // Check for dangerous characters
-                if username.contains(['<', '>', '"', '\'', '&', '\0']) {
-                    return Err(StratumError::SecurityViolation {
-                        message: "Username contains potentially dangerous characters".to_string(),
-                        severity: SecuritySeverity::Medium,
-                    });
-                }
-            }
-
-            "mining.submit" => {
-                let params = params
-                    .as_array()
-                    .ok_or_else(|| StratumError::ValidationFailed {
-                        field: "params".to_string(),
-                        message: "mining.submit params must be an array".to_string(),
-                        value: Some(params.to_string()),
-                    })?;
-
-                if params.len() != 5 {
-                    return Err(StratumError::ValidationFailed {
-                        field: "params".to_string(),
-                        message: "mining.submit requires exactly 5 parameters".to_string(),
-                        value: Some(format!("got {} parameters", params.len())),
-                    });
-                }
-
-                // Validate hex string parameters
-                for (i, param) in params.iter().skip(1).enumerate() {
-                    let hex_str = param
-                        .as_str()
-                        .ok_or_else(|| StratumError::ValidationFailed {
-                            field: format!("params[{}]", i + 1),
-                            message: "Submit parameters must be strings".to_string(),
-                            value: Some(param.to_string()),
-                        })?;
-
-                    if !hex_str.chars().all(|c| c.is_ascii_hexdigit()) {
-                        return Err(StratumError::ValidationFailed {
-                            field: format!("params[{}]", i + 1),
-                            message: "Submit parameter must be valid hex string".to_string(),
-                            value: Some(hex_str.to_string()),
-                        });
-                    }
-                }
-            }
-
-            "mining.subscribe" => {
-                if let Some(params) = params.as_array() {
-                    if params.len() > 2 {
-                        return Err(StratumError::ValidationFailed {
-                            field: "params".to_string(),
-                            message: "mining.subscribe accepts at most 2 parameters".to_string(),
-                            value: Some(format!("got {} parameters", params.len())),
-                        });
-                    }
-                }
-            }
-
-            // Accept other standard mining methods
-            "mining.extranonce.subscribe" | "mining.configure" | "mining.capabilities" => {
-                // These are valid but we don't validate their specific parameters yet
-            }
-
-            _ => {
-                warn!(method = method, "Unknown mining method");
-                // Don't fail on unknown methods to allow for protocol extensions
-            }
-        }
-
+        // REMOVED: All business validation logic removed to ensure transparent forwarding
+        // The proxy now forwards ALL messages to the upstream pool regardless of content validity
+        // Pool validation errors are relayed unchanged to miners
+        
+        // Previous validation logic included:
+        // - mining.authorize parameter validation (now forwarded to pool)
+        // - mining.submit parameter validation (now handled by pool)  
+        // - mining.subscribe parameter validation (now handled by pool)
+        // - Username format validation (now handled by pool)
+        // - Hex string validation (now handled by pool)
+        
+        // Log method for debugging but don't validate
+        debug!(method = method, "Processing method without validation (transparent mode)");
+        
+        // Pass through all methods without validation
         Ok(())
     }
 }

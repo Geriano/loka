@@ -359,21 +359,19 @@ impl DefaultProtocolMetrics {
         let validation_micros = duration.as_micros() as u64;
         self.connect_validation_time
             .fetch_add(validation_micros, Ordering::Relaxed);
-            
-        tracing::debug!(
-            "CONNECT validation: {} took {:?}",
-            result_type,
-            duration
-        );
+
+        tracing::debug!("CONNECT validation: {} took {:?}", result_type, duration);
     }
 
     /// Get CONNECT validation statistics
-    pub fn get_connect_validation_stats(&self) -> (std::collections::HashMap<String, u64>, Duration) {
+    pub fn get_connect_validation_stats(
+        &self,
+    ) -> (std::collections::HashMap<String, u64>, Duration) {
         let mut stats = std::collections::HashMap::new();
         for entry in self.connect_validation_counts.iter() {
             stats.insert(entry.key().clone(), entry.value().load(Ordering::Relaxed));
         }
-        
+
         let total_validations: u64 = stats.values().sum();
         let total_time_micros = self.connect_validation_time.load(Ordering::Relaxed);
         let avg_validation_time = if total_validations > 0 {
@@ -381,7 +379,7 @@ impl DefaultProtocolMetrics {
         } else {
             Duration::from_micros(0)
         };
-        
+
         (stats, avg_validation_time)
     }
 }

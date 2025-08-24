@@ -5,7 +5,7 @@ use dashmap::DashMap;
 static KEYS: OnceLock<DashMap<metrics::Key, String>> = OnceLock::new();
 
 pub(crate) fn to_string(key: &metrics::Key) -> String {
-    let keys = KEYS.get_or_init(|| Default::default());
+    let keys = KEYS.get_or_init(Default::default);
 
     keys.entry(key.clone())
         .or_insert_with(|| {

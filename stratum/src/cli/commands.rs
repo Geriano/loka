@@ -21,6 +21,9 @@ static STRATUM_METRICS: std::sync::OnceLock<Arc<MetricsService>> = std::sync::On
 pub async fn execute(args: Args) -> Result<()> {
     setup_logging(&args)?;
 
+    // Initialize Sentry early for error capture during startup
+    let _sentry_guard = crate::sentry::init_sentry(None)?;
+
     match args.command {
         crate::cli::Commands::Start {
             bind,
@@ -55,60 +58,6 @@ pub async fn execute(args: Args) -> Result<()> {
         crate::cli::Commands::Database { command, url } => {
             handle_database_command(command, url).await
         }
-        #[cfg(feature = "mock-pool")]
-        crate::cli::Commands::MockPool {
-            bind,
-            config,
-            accept_rate,
-            job_interval,
-            difficulty,
-            vardiff,
-            latency,
-            error_rate,
-        } => {
-            start_mock_pool(
-                bind,
-                config,
-                accept_rate,
-                job_interval,
-                difficulty,
-                vardiff,
-                latency,
-                error_rate,
-            )
-            .await
-        }
-        #[cfg(feature = "mock-miner")]
-        crate::cli::Commands::MockMiner {
-            pool,
-            config,
-            workers,
-            hashrate,
-            username,
-            password,
-            worker_prefix,
-            share_interval,
-            stale_rate,
-            invalid_rate,
-            duration,
-            log_mining,
-        } => {
-            start_mock_miner(
-                pool,
-                config,
-                workers,
-                hashrate,
-                username,
-                password,
-                worker_prefix,
-                share_interval,
-                stale_rate,
-                invalid_rate,
-                duration,
-                log_mining,
-            )
-            .await
-        }
     }
 }
 
@@ -138,6 +87,12 @@ async fn start_server(
     // Validate configuration using the validation module method
     config.validate()?;
     info!("Configuration validated successfully");
+
+    // Initialize Sentry with configuration if available
+    if let Some(ref sentry_config) = config.sentry {
+        let _sentry_guard = crate::sentry::init_sentry(Some(sentry_config))?;
+        info!("✅ Sentry integration configured from config file");
+    }
 
     // Initialize metrics if enabled
     if enable_metrics {
@@ -444,109 +399,533 @@ async fn get_prometheus_metrics() -> Result<String, StatusCode> {
     if let Some(stratum_metrics) = STRATUM_METRICS.get() {
         let global = stratum_metrics.get_global_snapshot();
 
-        // Global connection metrics
+        // Basic connection metrics
+        prometheus_output
+            .push_str("# HELP stratum_total_connections Total number of connections established\n");
+        prometheus_output.push_str("# TYPE stratum_total_connections counter\n");
         prometheus_output.push_str(&format!(
-            "# TYPE stratum_total_connections counter\nstratum_total_connections {}\n",
+            "stratum_total_connections {}\n",
             global.total_connections
         ));
+
+        prometheus_output
+            .push_str("# HELP stratum_active_connections Current number of active connections\n");
+        prometheus_output.push_str("# TYPE stratum_active_connections gauge\n");
         prometheus_output.push_str(&format!(
-            "# TYPE stratum_active_connections gauge\nstratum_active_connections {}\n",
+            "stratum_active_connections {}\n",
             global.active_connections
         ));
+
+        prometheus_output.push_str("# HELP stratum_connection_errors Total connection errors\n");
+        prometheus_output.push_str("# TYPE stratum_connection_errors counter\n");
         prometheus_output.push_str(&format!(
-            "# TYPE stratum_connection_errors counter\nstratum_connection_errors {}\n",
+            "stratum_connection_errors {}\n",
             global.connection_errors
         ));
 
-        // Protocol metrics
+        // Connection lifecycle metrics (Task 8.1)
+        prometheus_output.push_str(
+            "# HELP stratum_connection_duration_avg_seconds Average connection duration\n",
+        );
+        prometheus_output.push_str("# TYPE stratum_connection_duration_avg_seconds gauge\n");
         prometheus_output.push_str(&format!(
-            "# TYPE stratum_messages_received counter\nstratum_messages_received {}\n",
-            global.messages_received
-        ));
-        prometheus_output.push_str(&format!(
-            "# TYPE stratum_messages_sent counter\nstratum_messages_sent {}\n",
-            global.messages_sent
-        ));
-        prometheus_output.push_str(&format!(
-            "# TYPE stratum_bytes_received counter\nstratum_bytes_received {}\n",
-            global.bytes_received
-        ));
-        prometheus_output.push_str(&format!(
-            "# TYPE stratum_bytes_sent counter\nstratum_bytes_sent {}\n",
-            global.bytes_sent
+            "stratum_connection_duration_avg_seconds {:.6}\n",
+            global.avg_connection_duration_ms / 1000.0
         ));
 
-        // Auth metrics
+        prometheus_output.push_str(
+            "# HELP stratum_connection_duration_max_seconds Maximum connection duration\n",
+        );
+        prometheus_output.push_str("# TYPE stratum_connection_duration_max_seconds gauge\n");
         prometheus_output.push_str(&format!(
-            "# TYPE stratum_auth_attempts counter\nstratum_auth_attempts {}\n",
-            global.auth_attempts
-        ));
-        prometheus_output.push_str(&format!(
-            "# TYPE stratum_auth_successes counter\nstratum_auth_successes {}\n",
-            global.auth_successes
-        ));
-        prometheus_output.push_str(&format!(
-            "# TYPE stratum_auth_failures counter\nstratum_auth_failures {}\n",
-            global.auth_failures
+            "stratum_connection_duration_max_seconds {:.6}\n",
+            global.max_connection_duration_ms / 1000.0
         ));
 
-        // Submission metrics
+        prometheus_output.push_str(
+            "# HELP stratum_connection_duration_min_seconds Minimum connection duration\n",
+        );
+        prometheus_output.push_str("# TYPE stratum_connection_duration_min_seconds gauge\n");
         prometheus_output.push_str(&format!(
-            "# TYPE stratum_submissions_received counter\nstratum_submissions_received {}\n",
+            "stratum_connection_duration_min_seconds {:.6}\n",
+            global.min_connection_duration_ms / 1000.0
+        ));
+
+        prometheus_output.push_str("# HELP stratum_idle_time_seconds Current idle time gauge\n");
+        prometheus_output.push_str("# TYPE stratum_idle_time_seconds gauge\n");
+        prometheus_output.push_str(&format!(
+            "stratum_idle_time_seconds {:.6}\n",
+            global.idle_time_ms / 1000.0
+        ));
+
+        prometheus_output
+            .push_str("# HELP stratum_reconnection_attempts_total Total reconnection attempts\n");
+        prometheus_output.push_str("# TYPE stratum_reconnection_attempts_total counter\n");
+        prometheus_output.push_str(&format!(
+            "stratum_reconnection_attempts_total {}\n",
+            global.reconnection_attempts
+        ));
+
+        prometheus_output.push_str(
+            "# HELP stratum_connection_established_total Total connections established\n",
+        );
+        prometheus_output.push_str("# TYPE stratum_connection_established_total counter\n");
+        prometheus_output.push_str(&format!(
+            "stratum_connection_established_total {}\n",
+            global.connections_established
+        ));
+
+        prometheus_output
+            .push_str("# HELP stratum_connection_closed_total Total connections closed\n");
+        prometheus_output.push_str("# TYPE stratum_connection_closed_total counter\n");
+        prometheus_output.push_str(&format!(
+            "stratum_connection_closed_total {}\n",
+            global.connections_closed
+        ));
+
+        // Protocol detection metrics (Task 8.2)
+        prometheus_output
+            .push_str("# HELP stratum_http_requests_total Total HTTP requests detected\n");
+        prometheus_output.push_str("# TYPE stratum_http_requests_total counter\n");
+        prometheus_output.push_str(&format!(
+            "stratum_http_requests_total {}\n",
+            global.http_requests
+        ));
+
+        prometheus_output
+            .push_str("# HELP stratum_stratum_requests_total Total Stratum requests detected\n");
+        prometheus_output.push_str("# TYPE stratum_stratum_requests_total counter\n");
+        prometheus_output.push_str(&format!(
+            "stratum_stratum_requests_total {}\n",
+            global.stratum_requests
+        ));
+
+        prometheus_output.push_str(
+            "# HELP stratum_protocol_detection_failures_total Protocol detection failures\n",
+        );
+        prometheus_output.push_str("# TYPE stratum_protocol_detection_failures_total counter\n");
+        prometheus_output.push_str(&format!(
+            "stratum_protocol_detection_failures_total {}\n",
+            global.protocol_detection_failures
+        ));
+
+        prometheus_output.push_str(
+            "# HELP stratum_protocol_detection_successes_total Protocol detection successes\n",
+        );
+        prometheus_output.push_str("# TYPE stratum_protocol_detection_successes_total counter\n");
+        prometheus_output.push_str(&format!(
+            "stratum_protocol_detection_successes_total {}\n",
+            global.protocol_detection_successes
+        ));
+
+        prometheus_output.push_str(
+            "# HELP stratum_protocol_conversion_success_rate Protocol conversion success rate\n",
+        );
+        prometheus_output.push_str("# TYPE stratum_protocol_conversion_success_rate gauge\n");
+        prometheus_output.push_str(&format!(
+            "stratum_protocol_conversion_success_rate {:.6}\n",
+            global.protocol_conversion_success_rate
+        ));
+
+        prometheus_output.push_str(
+            "# HELP stratum_protocol_conversion_errors_total Protocol conversion errors\n",
+        );
+        prometheus_output.push_str("# TYPE stratum_protocol_conversion_errors_total counter\n");
+        prometheus_output.push_str(&format!(
+            "stratum_protocol_conversion_errors_total {}\n",
+            global.protocol_conversion_errors
+        ));
+
+        prometheus_output
+            .push_str("# HELP stratum_http_connect_requests_total HTTP CONNECT requests\n");
+        prometheus_output.push_str("# TYPE stratum_http_connect_requests_total counter\n");
+        prometheus_output.push_str(&format!(
+            "stratum_http_connect_requests_total {}\n",
+            global.http_connect_requests
+        ));
+
+        prometheus_output.push_str(
+            "# HELP stratum_direct_stratum_connections_total Direct Stratum connections\n",
+        );
+        prometheus_output.push_str("# TYPE stratum_direct_stratum_connections_total counter\n");
+        prometheus_output.push_str(&format!(
+            "stratum_direct_stratum_connections_total {}\n",
+            global.direct_stratum_connections
+        ));
+
+        // Mining operation metrics (Task 8.3)
+        prometheus_output
+            .push_str("# HELP stratum_share_submissions_total Total share submissions\n");
+        prometheus_output.push_str("# TYPE stratum_share_submissions_total counter\n");
+        prometheus_output.push_str(&format!(
+            "stratum_share_submissions_total {}\n",
             global.submissions_received
         ));
+
+        prometheus_output.push_str("# HELP stratum_share_acceptance_rate Share acceptance rate\n");
+        prometheus_output.push_str("# TYPE stratum_share_acceptance_rate gauge\n");
+        let acceptance_rate = if global.submissions_received > 0 {
+            global.submissions_accepted as f64 / global.submissions_received as f64
+        } else {
+            0.0
+        };
         prometheus_output.push_str(&format!(
-            "# TYPE stratum_submissions_accepted counter\nstratum_submissions_accepted {}\n",
+            "stratum_share_acceptance_rate {:.6}\n",
+            acceptance_rate
+        ));
+
+        prometheus_output
+            .push_str("# HELP stratum_difficulty_adjustments_total Total difficulty adjustments\n");
+        prometheus_output.push_str("# TYPE stratum_difficulty_adjustments_total counter\n");
+        prometheus_output.push_str(&format!(
+            "stratum_difficulty_adjustments_total {}\n",
+            global.difficulty_adjustments
+        ));
+
+        prometheus_output.push_str("# HELP stratum_job_distribution_latency_avg_seconds Average job distribution latency\n");
+        prometheus_output.push_str("# TYPE stratum_job_distribution_latency_avg_seconds gauge\n");
+        prometheus_output.push_str(&format!(
+            "stratum_job_distribution_latency_avg_seconds {:.6}\n",
+            global.avg_job_distribution_latency_ms / 1000.0
+        ));
+
+        prometheus_output.push_str("# HELP stratum_job_distribution_latency_max_seconds Maximum job distribution latency\n");
+        prometheus_output.push_str("# TYPE stratum_job_distribution_latency_max_seconds gauge\n");
+        prometheus_output.push_str(&format!(
+            "stratum_job_distribution_latency_max_seconds {:.6}\n",
+            global.max_job_distribution_latency_ms / 1000.0
+        ));
+
+        prometheus_output.push_str("# HELP stratum_job_distribution_latency_min_seconds Minimum job distribution latency\n");
+        prometheus_output.push_str("# TYPE stratum_job_distribution_latency_min_seconds gauge\n");
+        prometheus_output.push_str(&format!(
+            "stratum_job_distribution_latency_min_seconds {:.6}\n",
+            global.min_job_distribution_latency_ms / 1000.0
+        ));
+
+        prometheus_output.push_str("# HELP stratum_current_difficulty Current mining difficulty\n");
+        prometheus_output.push_str("# TYPE stratum_current_difficulty gauge\n");
+        prometheus_output.push_str(&format!(
+            "stratum_current_difficulty {:.2}\n",
+            global.current_difficulty
+        ));
+
+        prometheus_output.push_str("# HELP stratum_shares_per_minute Current shares per minute\n");
+        prometheus_output.push_str("# TYPE stratum_shares_per_minute gauge\n");
+        prometheus_output.push_str(&format!(
+            "stratum_shares_per_minute {}\n",
+            global.shares_per_minute
+        ));
+
+        prometheus_output.push_str("# HELP stratum_stale_shares_total Total stale shares\n");
+        prometheus_output.push_str("# TYPE stratum_stale_shares_total counter\n");
+        prometheus_output.push_str(&format!(
+            "stratum_stale_shares_total {}\n",
+            global.stale_shares
+        ));
+
+        prometheus_output
+            .push_str("# HELP stratum_duplicate_shares_total Total duplicate shares\n");
+        prometheus_output.push_str("# TYPE stratum_duplicate_shares_total counter\n");
+        prometheus_output.push_str(&format!(
+            "stratum_duplicate_shares_total {}\n",
+            global.duplicate_submissions
+        ));
+
+        // Error categorization metrics (Task 8.4)
+        prometheus_output.push_str("# HELP stratum_network_errors_total Network-related errors\n");
+        prometheus_output.push_str("# TYPE stratum_network_errors_total counter\n");
+        prometheus_output.push_str(&format!(
+            "stratum_network_errors_total {}\n",
+            global.network_errors
+        ));
+
+        prometheus_output
+            .push_str("# HELP stratum_authentication_failures_total Authentication failures\n");
+        prometheus_output.push_str("# TYPE stratum_authentication_failures_total counter\n");
+        prometheus_output.push_str(&format!(
+            "stratum_authentication_failures_total {}\n",
+            global.authentication_failures
+        ));
+
+        prometheus_output.push_str("# HELP stratum_timeout_errors Timeout errors\n");
+        prometheus_output.push_str("# TYPE stratum_timeout_errors counter\n");
+        prometheus_output.push_str(&format!(
+            "stratum_timeout_errors {}\n",
+            global.timeout_errors
+        ));
+
+        prometheus_output
+            .push_str("# HELP stratum_protocol_parse_errors Protocol parsing errors\n");
+        prometheus_output.push_str("# TYPE stratum_protocol_parse_errors counter\n");
+        prometheus_output.push_str(&format!(
+            "stratum_protocol_parse_errors {}\n",
+            global.protocol_parse_errors
+        ));
+
+        prometheus_output
+            .push_str("# HELP stratum_protocol_version_errors Protocol version errors\n");
+        prometheus_output.push_str("# TYPE stratum_protocol_version_errors counter\n");
+        prometheus_output.push_str(&format!(
+            "stratum_protocol_version_errors {}\n",
+            global.protocol_version_errors
+        ));
+
+        prometheus_output
+            .push_str("# HELP stratum_protocol_message_errors Protocol message errors\n");
+        prometheus_output.push_str("# TYPE stratum_protocol_message_errors counter\n");
+        prometheus_output.push_str(&format!(
+            "stratum_protocol_message_errors {}\n",
+            global.protocol_message_errors
+        ));
+
+        prometheus_output.push_str("# HELP stratum_validation_errors Validation errors\n");
+        prometheus_output.push_str("# TYPE stratum_validation_errors counter\n");
+        prometheus_output.push_str(&format!(
+            "stratum_validation_errors {}\n",
+            global.validation_errors
+        ));
+
+        prometheus_output
+            .push_str("# HELP stratum_security_violation_errors Security violation errors\n");
+        prometheus_output.push_str("# TYPE stratum_security_violation_errors counter\n");
+        prometheus_output.push_str(&format!(
+            "stratum_security_violation_errors {}\n",
+            global.security_violation_errors
+        ));
+
+        prometheus_output.push_str(
+            "# HELP stratum_resource_exhaustion_errors Resource exhaustion errors\n",
+        );
+        prometheus_output.push_str("# TYPE stratum_resource_exhaustion_errors counter\n");
+        prometheus_output.push_str(&format!(
+            "stratum_resource_exhaustion_errors {}\n",
+            global.resource_exhaustion_errors
+        ));
+
+        prometheus_output.push_str("# HELP stratum_internal_errors Internal errors\n");
+        prometheus_output.push_str("# TYPE stratum_internal_errors counter\n");
+        prometheus_output.push_str(&format!(
+            "stratum_internal_errors {}\n",
+            global.internal_errors
+        ));
+
+        // Resource utilization metrics (Task 8.5)
+        prometheus_output.push_str("# HELP stratum_memory_usage_per_connection_avg_bytes Average memory usage per connection\n");
+        prometheus_output.push_str("# TYPE stratum_memory_usage_per_connection_avg_bytes gauge\n");
+        prometheus_output.push_str(&format!(
+            "stratum_memory_usage_per_connection_avg_bytes {:.0}\n",
+            global.avg_memory_per_connection_mb * 1024.0 * 1024.0
+        ));
+
+        prometheus_output.push_str("# HELP stratum_memory_usage_per_connection_max_bytes Maximum memory usage per connection\n");
+        prometheus_output.push_str("# TYPE stratum_memory_usage_per_connection_max_bytes gauge\n");
+        prometheus_output.push_str(&format!(
+            "stratum_memory_usage_per_connection_max_bytes {:.0}\n",
+            global.max_memory_per_connection_mb * 1024.0 * 1024.0
+        ));
+
+        prometheus_output.push_str("# HELP stratum_memory_usage_per_connection_min_bytes Minimum memory usage per connection\n");
+        prometheus_output.push_str("# TYPE stratum_memory_usage_per_connection_min_bytes gauge\n");
+        prometheus_output.push_str(&format!(
+            "stratum_memory_usage_per_connection_min_bytes {:.0}\n",
+            global.min_memory_per_connection_mb * 1024.0 * 1024.0
+        ));
+
+        prometheus_output.push_str(
+            "# HELP stratum_cpu_utilization_percent Current CPU utilization percentage\n",
+        );
+        prometheus_output.push_str("# TYPE stratum_cpu_utilization_percent gauge\n");
+        prometheus_output.push_str(&format!(
+            "stratum_cpu_utilization_percent {:.2}\n",
+            global.cpu_utilization
+        ));
+
+        prometheus_output.push_str(
+            "# HELP stratum_network_bandwidth_rx_bpsond Network bandwidth receive rate\n",
+        );
+        prometheus_output.push_str("# TYPE stratum_network_bandwidth_rx_bpsond gauge\n");
+        prometheus_output.push_str(&format!(
+            "stratum_network_bandwidth_rx_bpsond {}\n",
+            global.network_bandwidth_rx_bps
+        ));
+
+        prometheus_output.push_str("# HELP stratum_network_bandwidth_tx_bpsond Network bandwidth transmit rate\n");
+        prometheus_output.push_str("# TYPE stratum_network_bandwidth_tx_bpsond gauge\n");
+        prometheus_output.push_str(&format!(
+            "stratum_network_bandwidth_tx_bpsond {}\n",
+            global.network_bandwidth_tx_bps
+        ));
+
+        prometheus_output.push_str(
+            "# HELP stratum_memory_usage_bytes Total memory used by connections\n",
+        );
+        prometheus_output.push_str("# TYPE stratum_memory_usage_bytes gauge\n");
+        prometheus_output.push_str(&format!(
+            "stratum_memory_usage_bytes {}\n",
+            global.memory_usage_bytes
+        ));
+
+        prometheus_output.push_str(
+            "# HELP stratum_connection_memory_peak Peak memory used by connections\n",
+        );
+        prometheus_output.push_str("# TYPE stratum_connection_memory_peak gauge\n");
+        prometheus_output.push_str(&format!(
+            "stratum_connection_memory_peak {}\n",
+            global.connection_memory_peak
+        ));
+
+        prometheus_output
+            .push_str("# HELP stratum_resource_pressure_events_total Resource pressure events\n");
+        prometheus_output.push_str("# TYPE stratum_resource_pressure_events_total counter\n");
+        prometheus_output.push_str(&format!(
+            "stratum_resource_pressure_events_total {}\n",
+            global.resource_pressure_events
+        ));
+
+        prometheus_output
+            .push_str("# HELP stratum_memory_efficiency_ratio Memory efficiency ratio\n");
+        prometheus_output.push_str("# TYPE stratum_memory_efficiency_ratio gauge\n");
+        prometheus_output.push_str(&format!(
+            "stratum_memory_efficiency_ratio {:.6}\n",
+            global.memory_efficiency_ratio
+        ));
+
+        // Legacy protocol metrics (existing)
+        prometheus_output.push_str("# HELP stratum_messages_received Total messages received\n");
+        prometheus_output.push_str("# TYPE stratum_messages_received counter\n");
+        prometheus_output.push_str(&format!(
+            "stratum_messages_received {}\n",
+            global.messages_received
+        ));
+
+        prometheus_output.push_str("# HELP stratum_messages_sent Total messages sent\n");
+        prometheus_output.push_str("# TYPE stratum_messages_sent counter\n");
+        prometheus_output.push_str(&format!("stratum_messages_sent {}\n", global.messages_sent));
+
+        prometheus_output.push_str("# HELP stratum_bytes_received Total bytes received\n");
+        prometheus_output.push_str("# TYPE stratum_bytes_received counter\n");
+        prometheus_output.push_str(&format!(
+            "stratum_bytes_received {}\n",
+            global.bytes_received
+        ));
+
+        prometheus_output.push_str("# HELP stratum_bytes_sent Total bytes sent\n");
+        prometheus_output.push_str("# TYPE stratum_bytes_sent counter\n");
+        prometheus_output.push_str(&format!("stratum_bytes_sent {}\n", global.bytes_sent));
+
+        // Legacy auth metrics (existing)
+        prometheus_output.push_str("# HELP stratum_auth_attempts Total authentication attempts\n");
+        prometheus_output.push_str("# TYPE stratum_auth_attempts counter\n");
+        prometheus_output.push_str(&format!("stratum_auth_attempts {}\n", global.auth_attempts));
+
+        prometheus_output
+            .push_str("# HELP stratum_auth_successes Total authentication successes\n");
+        prometheus_output.push_str("# TYPE stratum_auth_successes counter\n");
+        prometheus_output.push_str(&format!(
+            "stratum_auth_successes {}\n",
+            global.auth_successes
+        ));
+
+        prometheus_output.push_str("# HELP stratum_auth_failures Total authentication failures\n");
+        prometheus_output.push_str("# TYPE stratum_auth_failures counter\n");
+        prometheus_output.push_str(&format!("stratum_auth_failures {}\n", global.auth_failures));
+
+        // Legacy submission metrics (existing)
+        prometheus_output
+            .push_str("# HELP stratum_total_submissions Total submissions received\n");
+        prometheus_output.push_str("# TYPE stratum_total_submissions counter\n");
+        prometheus_output.push_str(&format!(
+            "stratum_total_submissions {}\n",
+            global.submissions_received
+        ));
+
+        prometheus_output
+            .push_str("# HELP stratum_accepted_submissions Total submissions accepted\n");
+        prometheus_output.push_str("# TYPE stratum_accepted_submissions counter\n");
+        prometheus_output.push_str(&format!(
+            "stratum_accepted_submissions {}\n",
             global.submissions_accepted
         ));
+
+        prometheus_output
+            .push_str("# HELP stratum_rejected_submissions Total submissions rejected\n");
+        prometheus_output.push_str("# TYPE stratum_rejected_submissions counter\n");
         prometheus_output.push_str(&format!(
-            "# TYPE stratum_submissions_rejected counter\nstratum_submissions_rejected {}\n",
+            "stratum_rejected_submissions {}\n",
             global.submissions_rejected
         ));
 
-        // Security metrics
+        // Legacy security metrics (existing)
+        prometheus_output
+            .push_str("# HELP stratum_security_violations Total security violations\n");
+        prometheus_output.push_str("# TYPE stratum_security_violations counter\n");
         prometheus_output.push_str(&format!(
-            "# TYPE stratum_security_violations counter\nstratum_security_violations {}\n",
+            "stratum_security_violations {}\n",
             global.security_violations
         ));
+
+        prometheus_output.push_str("# HELP stratum_rate_limit_hits Total rate limit hits\n");
+        prometheus_output.push_str("# TYPE stratum_rate_limit_hits counter\n");
         prometheus_output.push_str(&format!(
-            "# TYPE stratum_rate_limit_hits counter\nstratum_rate_limit_hits {}\n",
+            "stratum_rate_limit_hits {}\n",
             global.rate_limit_hits
         ));
 
-        // User metrics
+        // User metrics with proper TYPE declarations
         let users = stratum_metrics.get_all_user_metrics();
-        for user in users.iter().take(100) {
-            // Limit to 100 users to avoid huge responses
-            let user_id = sanitize_label_value(&user.user_id);
-            prometheus_output.push_str(&format!(
-                "stratum_user_submissions_received{{user=\"{}\"}} {}\n",
-                user_id, user.submissions_received
-            ));
-            prometheus_output.push_str(&format!(
-                "stratum_user_submissions_accepted{{user=\"{}\"}} {}\n",
-                user_id, user.submissions_accepted
-            ));
-            prometheus_output.push_str(&format!(
-                "stratum_user_submissions_rejected{{user=\"{}\"}} {}\n",
-                user_id, user.submissions_rejected
-            ));
-            prometheus_output.push_str(&format!(
-                "stratum_user_hashrate{{user=\"{}\"}} {}\n",
-                user_id, user.hashrate_estimate
-            ));
-            prometheus_output.push_str(&format!(
-                "stratum_user_connections{{user=\"{}\"}} {}\n",
-                user_id, user.connections
-            ));
-            prometheus_output.push_str(&format!(
-                "stratum_user_messages_received{{user=\"{}\"}} {}\n",
-                user_id, user.messages_received
-            ));
-            prometheus_output.push_str(&format!(
-                "stratum_user_messages_sent{{user=\"{}\"}} {}\n",
-                user_id, user.messages_sent
-            ));
+        if !users.is_empty() {
+            prometheus_output
+                .push_str("# HELP stratum_user_total_submissions User submissions received\n");
+            prometheus_output.push_str("# TYPE stratum_user_total_submissions gauge\n");
+            prometheus_output
+                .push_str("# HELP stratum_user_accepted_submissions User submissions accepted\n");
+            prometheus_output.push_str("# TYPE stratum_user_accepted_submissions gauge\n");
+            prometheus_output
+                .push_str("# HELP stratum_user_rejected_submissions User submissions rejected\n");
+            prometheus_output.push_str("# TYPE stratum_user_rejected_submissions gauge\n");
+            prometheus_output.push_str("# HELP stratum_user_hashrate User hashrate estimate\n");
+            prometheus_output.push_str("# TYPE stratum_user_hashrate gauge\n");
+            prometheus_output.push_str("# HELP stratum_user_connections User connection count\n");
+            prometheus_output.push_str("# TYPE stratum_user_connections gauge\n");
+            prometheus_output
+                .push_str("# HELP stratum_user_messages_received User messages received\n");
+            prometheus_output.push_str("# TYPE stratum_user_messages_received gauge\n");
+            prometheus_output.push_str("# HELP stratum_user_messages_sent User messages sent\n");
+            prometheus_output.push_str("# TYPE stratum_user_messages_sent gauge\n");
+
+            for user in users.iter().take(100) {
+                // Limit to 100 users to avoid huge responses
+                let user_id = sanitize_label_value(&user.user_id);
+                prometheus_output.push_str(&format!(
+                    "stratum_user_total_submissions{{user=\"{}\"}} {}\n",
+                    user_id, user.total_submissions
+                ));
+                prometheus_output.push_str(&format!(
+                    "stratum_user_accepted_submissions{{user=\"{}\"}} {}\n",
+                    user_id, user.accepted_submissions
+                ));
+                prometheus_output.push_str(&format!(
+                    "stratum_user_rejected_submissions{{user=\"{}\"}} {}\n",
+                    user_id, user.rejected_submissions
+                ));
+                prometheus_output.push_str(&format!(
+                    "stratum_user_hashrate{{user=\"{}\"}} {}\n",
+                    user_id, 0.0 // TODO: calculate from submission rate
+                ));
+                prometheus_output.push_str(&format!(
+                    "stratum_user_connections{{user=\"{}\"}} {}\n",
+                    user_id, user.total_connections
+                ));
+                prometheus_output.push_str(&format!(
+                    "stratum_user_messages_received{{user=\"{}\"}} {}\n",
+                    user_id, user.bytes_received
+                ));
+                prometheus_output.push_str(&format!(
+                    "stratum_user_messages_sent{{user=\"{}\"}} {}\n",
+                    user_id, user.bytes_sent
+                ));
+            }
         }
     }
 
@@ -585,6 +964,8 @@ async fn start_metrics_server(bind_addr: String) -> Result<impl std::future::Fut
         .route("/health", get(health_check))
         .route("/", get(health_check)); // Root path also serves health check
 
+    // Note: Sentry tower layer integration will be implemented in subtask 10.4
+
     info!("Starting metrics HTTP server on {}", bind_addr);
 
     Ok(async move {
@@ -606,7 +987,7 @@ async fn start_metrics_server(bind_addr: String) -> Result<impl std::future::Fut
 }
 
 fn setup_logging(args: &Args) -> Result<()> {
-    use tracing_subscriber::EnvFilter;
+    use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
     let log_level = match args.verbose {
         0 => &args.log_level,
@@ -617,140 +998,57 @@ fn setup_logging(args: &Args) -> Result<()> {
     let env_filter =
         EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(log_level));
 
-    // For now, use simple logging setup
-    // TODO: Implement different log formats when JSON support is available
-    tracing_subscriber::fmt().with_env_filter(env_filter).init();
+    // Check if JSON formatting is requested via environment or deployment
+    let use_json_format = std::env::var("LOG_FORMAT")
+        .map(|v| v.to_lowercase() == "json")
+        .unwrap_or_else(|_| {
+            // Auto-detect production environment for JSON formatting
+            std::env::var("ENVIRONMENT")
+                .or_else(|_| std::env::var("ENV"))
+                .map(|v| matches!(v.to_lowercase().as_str(), "production" | "prod"))
+                .unwrap_or(false)
+        });
 
-    Ok(())
-}
+    if use_json_format {
+        // Production/JSON logging with structured fields
+        let subscriber = tracing_subscriber::registry().with(env_filter).with(
+            fmt::layer()
+                .json()
+                .with_current_span(true)
+                .with_span_list(true)
+                .with_target(true)
+                .with_line_number(true)
+                .with_file(true)
+                .with_thread_ids(true)
+                .with_thread_names(true)
+                .flatten_event(false),
+        );
 
-#[cfg(feature = "mock-pool")]
-async fn start_mock_pool(
-    bind: String,
-    config_path: Option<std::path::PathBuf>,
-    accept_rate: f64,
-    job_interval: u64,
-    difficulty: u64,
-    vardiff: bool,
-    latency: u64,
-    error_rate: f64,
-) -> Result<()> {
-    use crate::mock::{MockConfig, MockPool};
+        // Note: Sentry tracing layer integration will be implemented in subtask 10.4
+        subscriber.init();
 
-    info!("Starting mock mining pool on {}", bind);
-
-    // Load or create config
-    let mut config = if let Some(path) = config_path {
-        let content = tokio::fs::read_to_string(path).await?;
-        toml::from_str(&content)?
+        info!("Structured JSON logging initialized");
     } else {
-        MockConfig::default()
-    };
+        // Development/human-readable logging
+        let subscriber = tracing_subscriber::registry().with(env_filter).with(
+            fmt::layer()
+                .with_target(true)
+                .with_line_number(true)
+                .with_file(false)
+                .with_thread_ids(false)
+                .with_thread_names(false)
+                .compact(),
+        );
 
-    // Override with CLI arguments
-    config.accept_rate = accept_rate;
-    config.job_interval_secs = job_interval;
-    config.initial_difficulty = difficulty;
-    config.vardiff_enabled = vardiff;
-    config.latency_ms = latency;
-    config.error_rate = error_rate;
+        // Note: Sentry tracing layer integration will be implemented in subtask 10.4
+        subscriber.init();
 
-    // Start the mock pool
-    let pool = MockPool::new(config);
-    let handle = pool.start(&bind).await?;
-
-    info!("Mock pool started successfully");
-    info!("Configuration:");
-    info!("  Accept rate: {:.1}%", accept_rate * 100.0);
-    info!("  Job interval: {}s", job_interval);
-    info!("  Initial difficulty: {}", difficulty);
-    info!(
-        "  Vardiff: {}",
-        if vardiff { "enabled" } else { "disabled" }
-    );
-    info!("  Latency: {}ms", latency);
-    info!("  Error rate: {:.1}%", error_rate * 100.0);
-    info!("");
-    info!("Press Ctrl+C to stop the mock pool");
-
-    // Wait for shutdown signal
-    tokio::select! {
-        _ = signal::ctrl_c() => {
-            info!("Received shutdown signal");
-        }
+        info!("Human-readable logging initialized");
     }
 
-    info!("Shutting down mock pool...");
-    handle.shutdown().await?;
-    info!("Mock pool shutdown completed");
-
     Ok(())
 }
 
-#[cfg(feature = "mock-miner")]
-async fn start_mock_miner(
-    pool: String,
-    config_path: Option<std::path::PathBuf>,
-    workers: usize,
-    hashrate: f64,
-    username: String,
-    password: String,
-    worker_prefix: String,
-    share_interval: f64,
-    stale_rate: f64,
-    invalid_rate: f64,
-    duration: u64,
-    log_mining: bool,
-) -> Result<()> {
-    use crate::miner::{MinerConfig, MinerSimulator};
-
-    info!("Starting mock miner targeting {}", pool);
-
-    // Load or create config
-    let mut config = if let Some(path) = config_path {
-        let content = tokio::fs::read_to_string(path).await?;
-        toml::from_str(&content)?
-    } else {
-        MinerConfig::default()
-    };
-
-    // Override with CLI arguments
-    config.pool_address = pool;
-    config.workers = workers;
-    config.hashrate_mhs = hashrate;
-    config.username = username;
-    config.password = password;
-    config.worker_prefix = worker_prefix;
-    config.share_interval_secs = share_interval;
-    config.stale_rate = stale_rate;
-    config.invalid_rate = invalid_rate;
-    config.duration_secs = duration;
-    config.log_mining = log_mining;
-
-    info!("Configuration:");
-    info!("  Pool address: {}", config.pool_address);
-    info!("  Workers: {}", config.workers);
-    info!("  Hashrate per worker: {:.2} MH/s", config.hashrate_mhs);
-    info!("  Total hashrate: {:.2} MH/s", config.total_hashrate());
-    info!("  Username: {}", config.username);
-    info!("  Share interval: {:.1}s", config.share_interval_secs);
-    info!("  Stale rate: {:.1}%", config.stale_rate * 100.0);
-    info!("  Invalid rate: {:.1}%", config.invalid_rate * 100.0);
-
-    if let Some(duration) = config.simulation_duration() {
-        info!("  Duration: {:.1}s", duration.as_secs_f64());
-    } else {
-        info!("  Duration: infinite");
-    }
-
-    info!("");
-
-    // Start the simulation
-    let simulator = MinerSimulator::new(config);
-    simulator.run().await?;
-
-    Ok(())
-}
 
 /// Handle database management commands
 async fn handle_database_command(command: crate::cli::DatabaseCommands, url: String) -> Result<()> {

@@ -10,6 +10,9 @@ pub struct Config {
     pub pool: PoolConfig,
     pub limiter: LimiterConfig,
     pub database: DatabaseConfig,
+    // NOTE: validation field removed - proxy acts as transparent reformatter
+    // All validation is now handled by upstream pool
+    pub sentry: Option<SentryConfig>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -55,6 +58,28 @@ pub struct LimiterConfig {
 pub struct DatabaseConfig {
     /// Database connection URL (PostgreSQL format)
     pub url: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SentryConfig {
+    /// Sentry DSN (Data Source Name) for error reporting
+    pub dsn: String,
+    /// Environment name (production, staging, development)
+    pub environment: Option<String>,
+    /// Sample rate for error events (0.0 to 1.0)
+    pub sample_rate: Option<f32>,
+    /// Sample rate for performance transactions (0.0 to 1.0)
+    pub traces_sample_rate: Option<f32>,
+    /// Enable debug mode for Sentry
+    pub debug: Option<bool>,
+    /// Release version identifier
+    pub release: Option<String>,
+    /// Maximum breadcrumbs to keep (default: 100)
+    pub max_breadcrumbs: Option<usize>,
+    /// Attach stack traces to messages
+    pub attach_stacktrace: Option<bool>,
+    /// Enable beforeSend filtering
+    pub enable_filtering: Option<bool>,
 }
 
 impl Default for ServerConfig {
@@ -103,6 +128,7 @@ impl Config {
                 database: DatabaseConfig {
                     url: database_service.url().to_string(),
                 },
+                sentry: None, // Sentry config loaded from environment or config file
             }),
             Err(DbErr::RecordNotFound(_)) | Ok(None) => Err(crate::error::StratumError::Internal {
                 message: "No active pool configuration found in database".to_string(),

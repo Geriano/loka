@@ -297,6 +297,30 @@ impl PoolConfigService {
         None
     }
 
+    /// Check if a target host:port combination is valid for a known pool
+    pub async fn is_valid_target(&self, host: &str, port: u16) -> bool {
+        let target = format!("{}:{}", host, port);
+        
+        // Check if we have a pool configuration for this target
+        match self.get_pool_config_by_target(&target).await {
+            Ok(Some(_)) => true,
+            Ok(None) => {
+                // Also try to validate against active pools
+                match self.list_active_pool_configs().await {
+                    Ok(configs) => {
+                        configs.iter().any(|config| {
+                            Self::parse_target(&config.address)
+                                .map(|(h, p)| h == host && p == port)
+                                .unwrap_or(false)
+                        })
+                    }
+                    Err(_) => false,
+                }
+            }
+            Err(_) => false,
+        }
+    }
+
     /// Parse target string into host and port components
     fn parse_target(target: &str) -> Option<(String, u16)> {
         if let Some(colon_pos) = target.rfind(':') {

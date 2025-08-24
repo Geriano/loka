@@ -22,7 +22,7 @@ dashmap = "6.1.0"
 dotenvy = { version = "0.15.7", features = ["cli", "clap"] }
 metrics = "0.24.2"
 tracing = "0.1.41"
-tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3.19", features = ["env-filter", "json"] }
 thiserror = "2.0.16"
 tokio = { version = "1.47.1", features = ["full"] }
 serde = { version = "1.0.219", features = ["derive"] }
@@ -45,6 +45,9 @@ sea-orm-migration = { version = "2.0.0-rc.4", features = ["runtime-tokio", "sqlx
 sea-query = { version = "1.0.0-rc.10", features = ["chrono", "rust_decimal", "with-rust_decimal", "uuid", "with-uuid"] }
 sqlx = { version = "0.8.6", features = ["chrono", "postgres", "sqlx-postgres", "rust_decimal", "sqlx-macros", "uuid"] }
 rust_decimal = { version = "1.37.2", features = ["serde"] }
+sentry = { version = "0.34.0", features = ["tracing", "tower", "tokio", "reqwest"] }
+sentry-tracing = "0.34.0"
+sentry-tower = "0.34.0"
 
 [workspace.dependencies.loka-metrics]
 path = "utils/metrics"

@@ -1,0 +1,116 @@
+# Sentry configuration for Loka Stratum monitoring
+# This file provides basic Sentry server configuration
+
+# System
+system.secret-key: '!!python/object/apply:base64.b64decode ["KSshKSFweXRob24vb2JqZWN0L2FwcGx5OmdldGF0dHIgW29zLCJlbnZpcm9uIl0gWyJTRU5UUllfU0VDUkVUX0tFWSJdXQ=="]'
+
+# Cache backend configuration (REQUIRED)
+cache.backend: 'sentry.cache.redis.RedisCache'
+cache.options:
+  hosts:
+    0:
+      host: sentry-redis
+      port: 6379
+      db: 1  # Use different DB for cache vs queues
+
+# Redis configuration
+redis.clusters:
+  default:
+    hosts:
+      0:
+        host: sentry-redis
+        port: 6379
+        db: 0
+
+# Broker configuration for Celery (background tasks)
+broker.url: 'redis://sentry-redis:6379/0'
+
+# Database configuration  
+database:
+  name: sentry
+  user: sentry
+  password: sentry123
+  host: sentry-postgres
+  port: 5432
+
+# Web server
+web:
+  host: 0.0.0.0
+  port: 9000
+  workers: 3
+  buffer-size: 32768
+
+# File storage
+filestore:
+  backend: filesystem
+  options:
+    location: /var/lib/sentry/files
+
+# Email configuration (disabled by default)
+mail.backend: 'dummy'
+mail.host: 'localhost'
+mail.port: 25
+mail.username: ''
+mail.password: ''
+mail.use-tls: false
+mail.from: 'admin@loka-stratum.local'
+
+# Performance and sampling
+system.event-retention-days: 30
+system.sample-rates:
+  errors: 1.0
+  transactions: 1.0
+  profiles: 1.0
+
+# Feature flags for mining-specific monitoring
+features:
+  organizations:crash-rate-alerts: true
+  organizations:performance-view: true  
+  organizations:profiling-view: true
+  organizations:session-replay: true
+  projects:custom-inbound-filters: true
+  projects:data-forwarding: true
+  projects:discard-groups: true
+  projects:race-free-group-creation: true
+
+# Logging
+system.logging:
+  level: INFO
+  format: '%(asctime)s %(levelname)s %(name)s: %(message)s'
+
+# Security
+system.url-prefix: http://localhost:9000
+system.admin-email: admin@loka-stratum.local
+
+# Rate limiting
+system.rate-limit: 500
+system.rate-limit-window: 60
+
+# Session configuration  
+session.cookie-secure: false
+session.cookie-httponly: true
+session.cookie-samesite: 'lax'
+
+# CSRF protection
+csrf.trusted-origins:
+  - localhost:9000
+  - 127.0.0.1:9000
+
+# Disable beacon (telemetry)
+beacon.anonymous: false
+
+# Mining-specific configurations
+# Allow longer transaction traces for mining operations
+system.transaction-trace-limit: 1000
+
+# Higher event limits for mining workloads
+system.event-max-size: 1048576  # 1MB
+system.raw-event-max-size: 2097152  # 2MB
+
+# Extended retention for mining operations
+system.store-retention-days: 30
+system.stats-retention-days: 30
+
+# Performance tuning for high-throughput mining
+system.worker-pool-size: 10
+system.celery-worker-concurrency: 4

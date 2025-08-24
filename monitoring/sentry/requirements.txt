@@ -1,0 +1,13 @@
+# Additional Python packages for Sentry
+# Mining-specific extensions and monitoring enhancements
+
+# Enhanced performance monitoring
+sentry-sdk[fastapi,sqlalchemy,aiohttp]>=1.40.0
+
+# Additional integrations for comprehensive monitoring
+redis>=4.5.0
+psycopg2-binary>=2.9.0
+
+# Mining protocol specific packages for better error tracking
+pycryptodome>=3.19.0
+pyyaml>=6.0.1

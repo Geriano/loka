@@ -71,6 +71,21 @@ scrape_configs:
     scrape_interval: 30s
     metrics_path: /metrics
 
+  # Error tracker (Pushgateway)
+  - job_name: "error-tracker"
+    static_configs:
+      - targets: ["error-tracker:9091"]
+    scrape_interval: 15s
+    metrics_path: /metrics
+    honor_labels: true
+
+  # Loki for log metrics
+  - job_name: "loki"
+    static_configs:
+      - targets: ["loki:3100"]
+    scrape_interval: 30s
+    metrics_path: /metrics
+
   # Docker auto-discovery disabled due to permission issues on macOS
   # All services are configured with static configs above
   # - job_name: 'docker-containers'

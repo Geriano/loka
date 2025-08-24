@@ -9,6 +9,7 @@ use tokio::sync::RwLock;
 use tracing::debug;
 
 use crate::error::{Result, StratumError};
+use crate::services::metrics::ResourceUtilizationSummary;
 
 /// System resource monitoring
 #[derive(Debug)]
@@ -118,6 +119,48 @@ impl ResourceMonitor {
             memory_pressure,
             high_cpu_usage: cpu_avg > 90.0,
             critical_memory: memory_pressure, // Placeholder - implement proper threshold
+        }
+    }
+
+    /// Get current resource utilization summary
+    pub async fn get_utilization_summary(&self) -> ResourceUtilizationSummary {
+        // Get current system metrics
+        let metrics = match self.update_metrics().await {
+            Ok(m) => m,
+            Err(_) => {
+                // Return default/empty summary on error
+                return ResourceUtilizationSummary::default();
+            }
+        };
+
+        // Get history for calculations
+        let cpu_avg = self.get_average_cpu_usage().await;
+        let cpu_history = self.cpu_usage_history.read().await;
+        let memory_history = self.memory_usage_history.read().await;
+
+        let peak_cpu = cpu_history.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).copied().unwrap_or(0.0) as f64;
+        let peak_memory = memory_history.iter().max().copied().unwrap_or(0) as f64 / (1024.0 * 1024.0); // Convert to MB
+
+        ResourceUtilizationSummary {
+            current_memory_mb: metrics.memory_used as f64 / (1024.0 * 1024.0), // Convert bytes to MB
+            peak_memory_mb: peak_memory,
+            available_memory_mb: (metrics.memory_total - metrics.memory_used) as f64 / (1024.0 * 1024.0),
+            connection_memory_bytes: 0, // Would need to track this separately
+            current_cpu_percent: metrics.cpu_usage as f64,
+            peak_cpu_percent: peak_cpu,
+            cpu_sample_count: cpu_history.len() as u64,
+            network_rx_bps: 0, // Would need network monitoring
+            network_tx_bps: 0,
+            peak_network_rx_bps: 0,
+            peak_network_tx_bps: 0,
+            load_avg_1min: 0.0,
+            load_avg_5min: 0.0,
+            load_avg_15min: 0.0,
+            memory_per_connection_mb: 0.0,
+            peak_memory_per_connection_mb: 0.0,
+            resource_pressure_events: 0,
+            last_pressure_event: None,
+            last_updated: std::time::SystemTime::now(),
         }
     }
 }

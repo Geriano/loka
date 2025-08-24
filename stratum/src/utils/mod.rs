@@ -1,5 +1,6 @@
 // Utility functions and helpers
 
+pub mod bitcoin_validation;
 pub mod hash_utils;
 pub mod memory_utils;
 pub mod string_pool;

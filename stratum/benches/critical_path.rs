@@ -28,6 +28,45 @@ fn bench_atomic_metrics(c: &mut Criterion) {
         })
     });
 
+    // Add benchmark for new metrics operations to ensure consistent performance
+    c.bench_function("new_metrics_single_thread", |b| {
+        b.iter(|| {
+            // Connection lifecycle metrics (Task 8.1)
+            metrics
+                .connection_established_counter
+                .fetch_add(1, Ordering::Relaxed);
+            metrics
+                .connection_duration_sum_ms_bits
+                .fetch_add(black_box(150_f64).to_bits(), Ordering::Relaxed);
+
+            // Protocol detection metrics (Task 8.2)
+            metrics
+                .stratum_requests_total
+                .fetch_add(1, Ordering::Relaxed);
+            metrics
+                .protocol_detection_successes
+                .fetch_add(1, Ordering::Relaxed);
+
+            // Mining operation metrics (Task 8.3)
+            metrics
+                .share_submissions_total
+                .fetch_add(1, Ordering::Relaxed);
+            metrics
+                .job_distribution_latency_sum_ms_bits
+                .fetch_add(black_box(5.0_f64).to_bits(), Ordering::Relaxed);
+
+            // Error categorization metrics (Task 8.4)
+            metrics
+                .network_errors_total
+                .fetch_add(black_box(0), Ordering::Relaxed);
+
+            // Resource utilization metrics (Task 8.5)
+            metrics
+                .memory_usage_per_connection_sum_bits
+                .fetch_add(black_box(1024.0_f64).to_bits(), Ordering::Relaxed);
+        })
+    });
+
     // Test concurrent access performance
     let mut group = c.benchmark_group("atomic_metrics_concurrent");
     for threads in [1, 2, 4, 8].iter() {

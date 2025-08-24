@@ -5,6 +5,7 @@ use tokio::time::sleep;
 use tracing::{debug, error, info, warn};
 
 use super::types::{ErrorAction, ErrorSeverity, Result, StratumError};
+use crate::services::metrics::MetricsService;
 
 /// Trait for handling errors in the Stratum system
 #[async_trait]
@@ -32,6 +33,7 @@ pub struct ErrorContext {
     pub timestamp: chrono::DateTime<chrono::Utc>,
     pub attempt_count: u32,
     pub max_attempts: u32,
+    pub metrics_service: Option<Arc<MetricsService>>,
 }
 
 impl ErrorContext {
@@ -45,6 +47,7 @@ impl ErrorContext {
             timestamp: chrono::Utc::now(),
             attempt_count: 0,
             max_attempts: 3,
+            metrics_service: None,
         }
     }
 
@@ -69,8 +72,20 @@ impl ErrorContext {
         self
     }
 
+    pub fn with_metrics_service(mut self, metrics_service: Arc<MetricsService>) -> Self {
+        self.metrics_service = Some(metrics_service);
+        self
+    }
+
     pub fn should_retry(&self) -> bool {
         self.attempt_count < self.max_attempts
+    }
+
+    /// Record the error in metrics if metrics service is available
+    pub fn record_error_metrics(&self, error: &StratumError) {
+        if let Some(ref metrics) = self.metrics_service {
+            metrics.record_categorized_error_event(&error.to_string());
+        }
     }
 }
 
@@ -121,6 +136,9 @@ impl Default for DefaultErrorHandler {
 impl ErrorHandler for DefaultErrorHandler {
     async fn handle_error(&self, error: &StratumError, context: &ErrorContext) -> ErrorAction {
         let severity = error.severity();
+
+        // Record error metrics if metrics service is available (Task 8.4)
+        context.record_error_metrics(error);
 
         // Log the error with appropriate level
         match severity {
@@ -215,6 +233,9 @@ impl Default for NetworkErrorHandler {
 #[async_trait]
 impl ErrorHandler for NetworkErrorHandler {
     async fn handle_error(&self, error: &StratumError, context: &ErrorContext) -> ErrorAction {
+        // Record error metrics if metrics service is available (Task 8.4)
+        context.record_error_metrics(error);
+
         match error {
             StratumError::Network { message, .. } => {
                 warn!(
@@ -308,6 +329,9 @@ impl Default for SecurityErrorHandler {
 #[async_trait]
 impl ErrorHandler for SecurityErrorHandler {
     async fn handle_error(&self, error: &StratumError, context: &ErrorContext) -> ErrorAction {
+        // Record error metrics if metrics service is available (Task 8.4)
+        context.record_error_metrics(error);
+
         match error {
             StratumError::SecurityViolation { message, severity } => {
                 error!(

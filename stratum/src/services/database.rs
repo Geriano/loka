@@ -39,16 +39,6 @@ impl DatabaseService {
                     source: Some(Box::new(e)),
                 })?;
 
-        // Run migrations automatically
-        Migrator::up(&connection, None).await.map_err(|e| {
-            crate::error::StratumError::Database {
-                message: format!("Failed to run migrations: {}", e),
-                source: Some(Box::new(e)),
-            }
-        })?;
-
-        tracing::info!("Database connected and migrations completed");
-
         Ok(DatabaseService {
             url: database_url.to_owned(),
             connection,
@@ -79,14 +69,6 @@ impl DatabaseService {
                     message: format!("Failed to connect to database: {}", e),
                     source: Some(Box::new(e)),
                 })?;
-
-        // Run migrations automatically
-        Migrator::up(&connection, None).await.map_err(|e| {
-            crate::error::StratumError::Database {
-                message: format!("Failed to run migrations: {}", e),
-                source: Some(Box::new(e)),
-            }
-        })?;
 
         tracing::info!(
             "Database connected with custom options (max: {}, min: {})",

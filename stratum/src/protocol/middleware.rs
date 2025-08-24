@@ -49,6 +49,11 @@ impl Middleware for ParsingMiddleware {
 }
 
 /// Middleware for validating parsed messages
+/// 
+/// NOTE: This middleware has been converted to a pass-through to ensure the proxy
+/// acts as a transparent reformatter. All business validation is now handled by
+/// the upstream pool, allowing invalid inputs to be forwarded and pool responses
+/// to be relayed unchanged to miners.
 #[derive(Debug)]
 pub struct ValidationMiddleware;
 
@@ -67,45 +72,16 @@ impl Default for ValidationMiddleware {
 #[async_trait]
 impl Middleware for ValidationMiddleware {
     async fn process(&self, context: MessageContext) -> Result<MessageContext> {
-        if let Some(ref message) = context.parsed_message {
-            match message {
-                StratumMessage::Authenticate { user, worker, .. } => {
-                    if user.is_empty() {
-                        return Err(StratumError::Protocol {
-                            message: "User cannot be empty".to_string(),
-                            method: Some("mining.authorize".to_string()),
-                            request_id: None,
-                        });
-                    }
-                    if worker.is_empty() {
-                        return Err(StratumError::Protocol {
-                            message: "Worker cannot be empty".to_string(),
-                            method: Some("mining.authorize".to_string()),
-                            request_id: None,
-                        });
-                    }
-                }
-                StratumMessage::SetDifficulty { difficulty } => {
-                    if *difficulty <= 0.0 {
-                        return Err(StratumError::Protocol {
-                            message: "Difficulty must be positive".to_string(),
-                            method: None,
-                            request_id: None,
-                        });
-                    }
-                }
-                StratumMessage::Submit { job_id, .. } => {
-                    if job_id.is_empty() {
-                        return Err(StratumError::Protocol {
-                            message: "Job ID cannot be empty".to_string(),
-                            method: None,
-                            request_id: None,
-                        });
-                    }
-                }
-                _ => {} // Other messages pass validation
-            }
-        }
+        // REMOVED: All business validation logic removed to ensure transparent forwarding
+        // The proxy now forwards ALL messages to the upstream pool regardless of content validity
+        // Pool validation errors are relayed unchanged to miners
+        
+        // Previous validation logic included:
+        // - Empty user/worker validation (now forwarded to pool)
+        // - Difficulty validation (now handled by pool)
+        // - Job ID validation (now handled by pool)
+        
+        // Pass through all messages without validation
         Ok(context)
     }
 }

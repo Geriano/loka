@@ -1,0 +1,55 @@
+# Sentry configuration for Loka Stratum
+# This YAML format is the newer configuration format
+
+# Database configuration
+database:
+  name: sentry
+  user: sentry
+  password: sentry123
+  host: sentry-postgres
+  port: 5432
+  autocommit: true
+  atomic_requests: false
+
+# Cache configuration (CRITICAL - fixes the error)
+cache:
+  backend: sentry.cache.redis.RedisCache
+  options:
+    hosts:
+      0:
+        host: sentry-redis
+        port: 6379
+        db: 1
+
+# Redis clusters for various subsystems
+redis.clusters:
+  default:
+    hosts:
+      - host: sentry-redis
+        port: 6379
+        db: 0
+
+# File storage
+filestore:
+  backend: filesystem
+  options:
+    location: /var/lib/sentry/files
+
+# System configuration  
+system.secret-key: 'e)2b1w$!g(n2=8#!-*4^u=hh13h8(p(ypp!y$_6e^!@@96z2%c'
+system.url-prefix: 'http://localhost:9000'
+
+# Disable telemetry
+beacon.anonymous: false
+
+# Email (using console backend for development)
+mail.backend: 'django.core.mail.backends.console.EmailBackend'
+mail.host: 'localhost'
+mail.port: 25
+mail.from: 'admin@loka-stratum.local'
+
+# Features
+features:
+  organizations:crash-rate-alerts: true
+  organizations:performance-view: true
+  organizations:profiling-view: true

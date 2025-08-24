@@ -2,143 +2,354 @@ groups:
   - name: loka-stratum.rules
     interval: 30s
     rules:
-      # Connection metrics
+      # Connection metrics (updated to match actual Stratum metrics)
       - record: loka:connection_rate
-        expr: rate(loka_connections_total[5m])
+        expr: rate(stratum_connection_established_counter[5m])
       
       - record: loka:active_connections
-        expr: loka_connections_active
+        expr: stratum_active_connections
       
-      - record: loka:connection_success_rate
-        expr: rate(loka_connections_successful[5m]) / rate(loka_connections_total[5m])
+      - record: loka:connection_pool_utilization
+        expr: (stratum_active_connections / 1000) * 100
+      
+      - record: loka:reconnection_rate
+        expr: rate(stratum_reconnection_attempts_counter[5m])
 
-      # Mining metrics
-      - record: loka:shares_per_second
-        expr: rate(loka_shares_submitted[5m])
+      # Protocol detection metrics
+      - record: loka:protocol_detection_success_rate
+        expr: (stratum_protocol_detection_successes / (stratum_protocol_detection_successes + stratum_protocol_detection_failures)) * 100
+      
+      - record: loka:protocol_conversion_success_rate
+        expr: stratum_protocol_conversion_avg_success_rate * 100
+
+      # Mining metrics (updated to match actual Stratum metrics)
+      - record: loka:shares_per_minute
+        expr: stratum_shares_per_minute_gauge
       
       - record: loka:share_acceptance_rate
-        expr: rate(loka_shares_accepted[5m]) / rate(loka_shares_submitted[5m])
+        expr: stratum_share_acceptance_avg_rate * 100
       
-      - record: loka:hashrate_estimate
-        expr: avg(loka_hashrate_estimate_gh_per_s)
+      - record: loka:hashrate_estimate_ghps
+        expr: (stratum_shares_per_minute_gauge * stratum_current_difficulty) / 60 / 1000000000
+      
+      - record: loka:difficulty_adjustments_rate
+        expr: rate(stratum_difficulty_adjustments_counter[5m])
 
-      # Performance metrics
+      # Performance metrics (updated to match actual Stratum metrics)
       - record: loka:message_processing_rate
-        expr: rate(loka_messages_processed[5m])
+        expr: rate(stratum_messages_received[5m])
       
-      - record: loka:avg_message_processing_time
-        expr: avg(loka_message_processing_duration_seconds)
+      - record: loka:submission_processing_rate
+        expr: rate(stratum_submissions_received[5m])
       
-      - record: loka:error_rate
-        expr: rate(loka_errors_total[5m])
+      - record: loka:job_distribution_latency_avg
+        expr: stratum_job_distribution_latency_avg_ms
+      
+      - record: loka:job_distribution_latency_max
+        expr: stratum_job_distribution_latency_max_ms
 
-      # System health metrics
-      - record: loka:memory_usage_ratio
-        expr: loka_memory_usage_bytes / loka_memory_limit_bytes
+      # Error metrics (updated to match actual Stratum error categories)
+      - record: loka:total_error_rate
+        expr: rate(stratum_network_errors_total[5m]) + rate(stratum_timeout_errors_total[5m]) + rate(stratum_authentication_failures_total[5m]) + rate(stratum_protocol_parse_errors_total[5m]) + rate(stratum_validation_errors_total[5m])
       
-      - record: loka:cpu_usage_percent
-        expr: rate(loka_cpu_time_seconds[5m]) * 100
+      - record: loka:critical_error_rate
+        expr: rate(stratum_security_violation_errors_total[5m]) + rate(stratum_resource_exhaustion_errors_total[5m]) + rate(stratum_internal_errors_total[5m])
+      
+      - record: loka:network_error_rate
+        expr: rate(stratum_network_errors_total[5m])
+      
+      - record: loka:auth_failure_rate
+        expr: rate(stratum_authentication_failures_total[5m])
+
+      # Resource utilization metrics (updated to match actual Stratum metrics)
+      - record: loka:memory_usage_per_connection_avg_mb
+        expr: stratum_memory_usage_per_connection_avg_mb
+      
+      - record: loka:memory_usage_per_connection_max_mb
+        expr: stratum_memory_usage_per_connection_max_mb
+      
+      - record: loka:cpu_utilization_percent
+        expr: stratum_cpu_utilization_current_percent
+      
+      - record: loka:memory_efficiency_percent
+        expr: stratum_memory_efficiency_ratio * 100
+      
+      - record: loka:network_bandwidth_rx_bps
+        expr: stratum_network_bandwidth_rx_bytes_per_sec
+      
+      - record: loka:network_bandwidth_tx_bps
+        expr: stratum_network_bandwidth_tx_bytes_per_sec
+      
+      - record: loka:resource_pressure_rate
+        expr: rate(stratum_resource_pressure_events[5m])
 
   - name: loka-stratum.alerts
     rules:
-      # Critical alerts
+      # Critical Service Health Alerts
       - alert: LokaStratumDown
         expr: up{job="loka-stratum"} == 0
         for: 1m
         labels:
           severity: critical
           service: loka-stratum
+          category: service-health
         annotations:
-          summary: "Loka Stratum is down"
-          description: "Loka Stratum has been down for more than 1 minute"
+          summary: "Loka Stratum proxy is down"
+          description: "Loka Stratum proxy service has been unreachable for more than 1 minute"
 
-      - alert: HighErrorRate
-        expr: loka:error_rate > 10
+      - alert: CriticalErrorRateHigh
+        expr: loka:critical_error_rate > 5
         for: 2m
         labels:
           severity: critical
           service: loka-stratum
+          category: errors
         annotations:
-          summary: "High error rate detected"
-          description: "Error rate is {{ $value }} errors/second for 2 minutes"
+          summary: "Critical error rate is dangerously high"
+          description: "Critical errors (security, resource exhaustion, internal) occurring at {{ $value }} errors/second for 2 minutes"
 
-      - alert: LowShareAcceptanceRate
-        expr: loka:share_acceptance_rate < 0.9
-        for: 5m
-        labels:
-          severity: warning
-          service: loka-stratum
-        annotations:
-          summary: "Low share acceptance rate"
-          description: "Share acceptance rate is {{ $value | humanizePercentage }} for 5 minutes"
-
-      # Performance alerts
-      - alert: HighMemoryUsage
-        expr: loka:memory_usage_ratio > 0.8
-        for: 5m
-        labels:
-          severity: warning
-          service: loka-stratum
-        annotations:
-          summary: "High memory usage"
-          description: "Memory usage is {{ $value | humanizePercentage }} for 5 minutes"
-
-      - alert: HighCPUUsage
-        expr: loka:cpu_usage_percent > 80
-        for: 5m
-        labels:
-          severity: warning
-          service: loka-stratum
-        annotations:
-          summary: "High CPU usage"
-          description: "CPU usage is {{ $value }}% for 5 minutes"
-
-      - alert: SlowMessageProcessing
-        expr: loka:avg_message_processing_time > 0.001
+      - alert: TotalErrorRateHigh
+        expr: loka:total_error_rate > 20
         for: 3m
         labels:
+          severity: critical
+          service: loka-stratum
+          category: errors
+        annotations:
+          summary: "Total error rate is too high"
+          description: "Combined error rate is {{ $value }} errors/second for 3 minutes"
+
+      # Connection Health Alerts
+      - alert: ConnectionPoolNearCapacity
+        expr: loka:connection_pool_utilization > 90
+        for: 3m
+        labels:
+          severity: critical
+          service: loka-stratum
+          category: connections
+        annotations:
+          summary: "Connection pool near capacity"
+          description: "Connection pool utilization is {{ $value }}% for 3 minutes"
+
+      - alert: ConnectionPoolHighUtilization
+        expr: loka:connection_pool_utilization > 75
+        for: 5m
+        labels:
           severity: warning
           service: loka-stratum
+          category: connections
         annotations:
-          summary: "Slow message processing"
-          description: "Average message processing time is {{ $value }}s for 3 minutes"
+          summary: "High connection pool utilization"
+          description: "Connection pool utilization is {{ $value }}% for 5 minutes"
 
-      # Business alerts
+      - alert: HighReconnectionRate
+        expr: loka:reconnection_rate > 5
+        for: 5m
+        labels:
+          severity: warning
+          service: loka-stratum
+          category: connections
+        annotations:
+          summary: "High reconnection rate detected"
+          description: "{{ $value }} reconnections/second for 5 minutes - possible connection instability"
+
       - alert: NoActiveConnections
         expr: loka:active_connections == 0
         for: 2m
         labels:
           severity: warning
           service: loka-stratum
+          category: business
         annotations:
           summary: "No active mining connections"
           description: "No miners are currently connected for 2 minutes"
 
-      - alert: LowHashrate
-        expr: loka:hashrate_estimate < 1
+      # Protocol Detection Alerts
+      - alert: ProtocolDetectionFailureHigh
+        expr: loka:protocol_detection_success_rate < 85
+        for: 5m
+        labels:
+          severity: warning
+          service: loka-stratum
+          category: protocol
+        annotations:
+          summary: "Protocol detection success rate is low"
+          description: "Protocol detection success rate is {{ $value }}% for 5 minutes"
+
+      - alert: ProtocolConversionFailureHigh
+        expr: loka:protocol_conversion_success_rate < 90
+        for: 5m
+        labels:
+          severity: warning
+          service: loka-stratum
+          category: protocol
+        annotations:
+          summary: "Protocol conversion success rate is low"
+          description: "Protocol conversion success rate is {{ $value }}% for 5 minutes"
+
+      # Mining Performance Alerts
+      - alert: ShareAcceptanceRateLow
+        expr: loka:share_acceptance_rate < 90
         for: 10m
+        labels:
+          severity: warning
+          service: loka-stratum
+          category: mining
+        annotations:
+          summary: "Share acceptance rate is low"
+          description: "Share acceptance rate is {{ $value }}% for 10 minutes"
+
+      - alert: ShareAcceptanceRateCritical
+        expr: loka:share_acceptance_rate < 75
+        for: 5m
+        labels:
+          severity: critical
+          service: loka-stratum
+          category: mining
+        annotations:
+          summary: "Share acceptance rate critically low"
+          description: "Share acceptance rate is {{ $value }}% for 5 minutes"
+
+      - alert: JobDistributionLatencyHigh
+        expr: loka:job_distribution_latency_avg > 100
+        for: 5m
+        labels:
+          severity: warning
+          service: loka-stratum
+          category: performance
+        annotations:
+          summary: "Job distribution latency is high"
+          description: "Average job distribution latency is {{ $value }}ms for 5 minutes"
+
+      - alert: JobDistributionLatencyCritical
+        expr: loka:job_distribution_latency_max > 500
+        for: 3m
+        labels:
+          severity: critical
+          service: loka-stratum
+          category: performance
+        annotations:
+          summary: "Job distribution latency critically high"
+          description: "Maximum job distribution latency is {{ $value }}ms for 3 minutes"
+
+      - alert: LowHashrate
+        expr: loka:hashrate_estimate_ghps < 1
+        for: 15m
         labels:
           severity: info
           service: loka-stratum
+          category: business
         annotations:
-          summary: "Low network hashrate"
-          description: "Estimated hashrate is {{ $value }} GH/s for 10 minutes"
+          summary: "Network hashrate is low"
+          description: "Estimated hashrate is {{ $value }} GH/s for 15 minutes"
 
-      # Infrastructure alerts
+      # Resource Utilization Alerts
+      - alert: HighCPUUtilization
+        expr: loka:cpu_utilization_percent > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: loka-stratum
+          category: resources
+        annotations:
+          summary: "CPU utilization is high"
+          description: "CPU utilization is {{ $value }}% for 5 minutes"
+
+      - alert: CriticalCPUUtilization
+        expr: loka:cpu_utilization_percent > 95
+        for: 2m
+        labels:
+          severity: critical
+          service: loka-stratum
+          category: resources
+        annotations:
+          summary: "CPU utilization critically high"
+          description: "CPU utilization is {{ $value }}% for 2 minutes"
+
+      - alert: HighMemoryPerConnection
+        expr: loka:memory_usage_per_connection_avg_mb > 50
+        for: 5m
+        labels:
+          severity: warning
+          service: loka-stratum
+          category: resources
+        annotations:
+          summary: "Memory usage per connection is high"
+          description: "Average memory per connection is {{ $value }}MB for 5 minutes"
+
+      - alert: LowMemoryEfficiency
+        expr: loka:memory_efficiency_percent < 70
+        for: 10m
+        labels:
+          severity: warning
+          service: loka-stratum
+          category: resources
+        annotations:
+          summary: "Memory efficiency is low"
+          description: "Memory efficiency is {{ $value }}% for 10 minutes"
+
+      - alert: ResourcePressureHigh
+        expr: loka:resource_pressure_rate > 1
+        for: 3m
+        labels:
+          severity: critical
+          service: loka-stratum
+          category: resources
+        annotations:
+          summary: "System resource pressure detected"
+          description: "Resource pressure events occurring at {{ $value }} events/second for 3 minutes"
+
+      # Network Performance Alerts
+      - alert: HighNetworkBandwidthUsage
+        expr: (loka:network_bandwidth_rx_bps + loka:network_bandwidth_tx_bps) > 100000000
+        for: 5m
+        labels:
+          severity: warning
+          service: loka-stratum
+          category: network
+        annotations:
+          summary: "High network bandwidth usage"
+          description: "Combined network bandwidth is {{ $value | humanize }}B/s for 5 minutes"
+
+      - alert: NetworkErrorRateHigh
+        expr: loka:network_error_rate > 10
+        for: 3m
+        labels:
+          severity: warning
+          service: loka-stratum
+          category: network
+        annotations:
+          summary: "High network error rate"
+          description: "Network errors occurring at {{ $value }} errors/second for 3 minutes"
+
+      - alert: AuthenticationFailureRateHigh
+        expr: loka:auth_failure_rate > 5
+        for: 5m
+        labels:
+          severity: warning
+          service: loka-stratum
+          category: security
+        annotations:
+          summary: "High authentication failure rate"
+          description: "Authentication failures at {{ $value }} failures/second for 5 minutes - possible attack"
+
+      # Infrastructure Alerts
       - alert: PrometheusTargetDown
         expr: up == 0
         for: 1m
         labels:
           severity: warning
+          category: infrastructure
         annotations:
-          summary: "Prometheus target down"
-          description: "{{ $labels.job }} target has been down for 1 minute"
+          summary: "Prometheus target unreachable"
+          description: "{{ $labels.job }} target has been unreachable for 1 minute"
 
       - alert: HighDiskUsage
         expr: (node_filesystem_size_bytes - node_filesystem_free_bytes) / node_filesystem_size_bytes > 0.8
         for: 5m
         labels:
           severity: warning
+          category: infrastructure
         annotations:
-          summary: "High disk usage"
+          summary: "High disk usage detected"
           description: "Disk usage is {{ $value | humanizePercentage }} on {{ $labels.instance }}"

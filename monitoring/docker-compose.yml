@@ -136,12 +136,63 @@ services:
       timeout: 10s
       retries: 3
 
+  # Loki for log aggregation (alternative to Sentry)
+  loki:
+    image: grafana/loki:2.9.0
+    restart: unless-stopped
+    ports:
+      - "3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./loki/loki-config.yaml:/etc/loki/local-config.yaml:ro
+      - loki-data:/loki
+    environment:
+      - LOKI_DATA_PATH=/loki
+    user: "10001:10001"
+    networks:
+      - loka-monitoring-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3100/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Promtail for log collection
+  promtail:
+    image: grafana/promtail:2.9.0
+    restart: unless-stopped
+    command: -config.file=/etc/promtail/config.yml
+    volumes:
+      - ./loki/promtail-config.yaml:/etc/promtail/config.yml:ro
+      - /var/log:/var/log:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    networks:
+      - loka-monitoring-network
+    depends_on:
+      - loki
+
+  # Error tracking service using Prometheus Pushgateway
+  error-tracker:
+    image: prom/pushgateway:v1.6.2
+    restart: unless-stopped
+    ports:
+      - "9091"
+    networks:
+      - loka-monitoring-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9091/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
 volumes:
   prometheus-data:
     driver: local
   grafana-data:
     driver: local
   alertmanager-data:
+    driver: local
+  loki-data:
     driver: local
 
 networks:

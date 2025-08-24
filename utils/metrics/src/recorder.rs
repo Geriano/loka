@@ -27,7 +27,7 @@ impl Recorder {
     }
 
     pub fn init() -> Result<&'static Self, metrics::SetRecorderError<&'static Self>> {
-        let recorder = RECORDER.get_or_init(|| Self::new());
+        let recorder = RECORDER.get_or_init(Self::new);
 
         metrics::set_global_recorder(recorder).map(|_| recorder)
     }

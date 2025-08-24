@@ -304,7 +304,7 @@ impl Histogram {
     /// - **Memory**: ~128 bytes total
     pub fn new() -> Self {
         Self {
-            slots: [0u64; 12].map(|v| AtomicU64::new(v)),
+            slots: [0u64; 12].map(AtomicU64::new),
             bounds: (
                 AtomicU64::new((-1e6_f64).to_bits()),
                 AtomicU64::new(1e6_f64.to_bits()),

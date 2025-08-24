@@ -1,0 +1,100 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  # Collect Docker container logs
+  - job_name: containers
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: containerlogs
+          __path__: /var/lib/docker/containers/*/*log
+
+    pipeline_stages:
+      - json:
+          expressions:
+            output: log
+            stream: stream
+            attrs:
+      - json:
+          source: attrs
+          expressions:
+            tag:
+      - regex:
+          source: tag
+          expression: (?P<container_name>(?:[^|]*[^|])).* 
+      - timestamp:
+          source: time
+          format: RFC3339Nano
+      - labels:
+          stream:
+          container_name:
+      - output:
+          source: output
+
+  # Collect system logs
+  - job_name: syslog
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: syslog
+          __path__: /var/log/syslog*
+
+  # Collect Loka Stratum specific logs (if using file logging)
+  - job_name: loka-stratum
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: loka-stratum
+          service: loka-stratum-proxy
+          __path__: /var/log/loka-stratum/*.log
+
+    pipeline_stages:
+      # Parse structured JSON logs from Loka Stratum
+      - json:
+          expressions:
+            timestamp: timestamp
+            level: level
+            message: message
+            target: target
+            span: span
+            fields: fields
+            connection_id: fields.connection_id
+            pool_id: fields.pool_id
+            miner_id: fields.miner_id
+            error_type: fields.error_type
+
+      - timestamp:
+          source: timestamp
+          format: RFC3339
+
+      - labels:
+          level:
+          target:
+          connection_id:
+          pool_id:
+          miner_id:
+          error_type:
+
+      # Filter and classify error levels
+      - match:
+          selector: '{level="ERROR"}'
+          stages:
+            - labels:
+                error_level: "error"
+      
+      - match:
+          selector: '{level="WARN"}'
+          stages:
+            - labels:
+                error_level: "warning"

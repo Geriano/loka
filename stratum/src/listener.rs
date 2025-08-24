@@ -60,6 +60,9 @@ impl Listener {
                 Ok((downstream, addr)) => {
                     tracing::info!("new miner connection from {}", addr);
 
+                    // Track connection establishment (Task 8.1)
+                    manager.connection_established(&addr);
+
                     metrics::counter!("network_connected_total").increment(1);
 
                     let connection_path: Option<String> = None;

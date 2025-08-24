@@ -1,0 +1,171 @@
+groups:
+  - name: loka-stratum-errors
+    interval: 30s
+    rules:
+      # High error rate detection
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum(rate(loka_stratum_errors_total[5m])) by (service) 
+            / 
+            sum(rate(loka_stratum_requests_total[5m])) by (service)
+          ) > 0.05
+        for: 2m
+        labels:
+          severity: warning
+          service: loka-stratum
+          alert_type: error_rate
+        annotations:
+          summary: "High error rate detected for {{ $labels.service }}"
+          description: "Error rate is {{ $value | humanizePercentage }} for service {{ $labels.service }}"
+
+      # Critical error burst detection
+      - alert: CriticalErrorBurst
+        expr: |
+          sum(rate(loka_stratum_errors_total{level="ERROR"}[1m])) by (service) > 10
+        for: 1m
+        labels:
+          severity: critical
+          service: loka-stratum
+          alert_type: error_burst
+        annotations:
+          summary: "Critical error burst detected for {{ $labels.service }}"
+          description: "{{ $value }} critical errors per second in {{ $labels.service }}"
+
+      # Connection errors
+      - alert: ConnectionErrors
+        expr: |
+          sum(rate(loka_stratum_connection_errors_total[5m])) by (error_type) > 1
+        for: 2m
+        labels:
+          severity: warning
+          service: loka-stratum
+          alert_type: connection_error
+        annotations:
+          summary: "High connection error rate: {{ $labels.error_type }}"
+          description: "{{ $value }} connection errors per second of type {{ $labels.error_type }}"
+
+      # Protocol errors
+      - alert: ProtocolErrors
+        expr: |
+          sum(rate(loka_stratum_protocol_errors_total[5m])) by (protocol, error_type) > 0.5
+        for: 3m
+        labels:
+          severity: warning
+          service: loka-stratum
+          alert_type: protocol_error
+        annotations:
+          summary: "Protocol errors in {{ $labels.protocol }}"
+          description: "{{ $value }} protocol errors per second: {{ $labels.error_type }}"
+
+      # Database errors
+      - alert: DatabaseErrors
+        expr: |
+          sum(rate(loka_stratum_database_errors_total[5m])) by (operation) > 0.2
+        for: 5m
+        labels:
+          severity: critical
+          service: loka-stratum
+          alert_type: database_error
+        annotations:
+          summary: "Database errors in {{ $labels.operation }}"
+          description: "{{ $value }} database errors per second during {{ $labels.operation }}"
+
+      # Memory leaks detection
+      - alert: MemoryLeak
+        expr: |
+          increase(process_resident_memory_bytes[1h]) > 100*1024*1024
+        for: 30m
+        labels:
+          severity: warning
+          service: loka-stratum
+          alert_type: memory_leak
+        annotations:
+          summary: "Possible memory leak detected"
+          description: "Memory usage increased by {{ $value | humanize }}B in the last hour"
+
+  - name: loka-stratum-performance
+    interval: 30s
+    rules:
+      # Slow response times
+      - alert: SlowResponseTime
+        expr: |
+          histogram_quantile(0.95, 
+            sum(rate(loka_stratum_request_duration_seconds_bucket[5m])) by (le, method)
+          ) > 1.0
+        for: 5m
+        labels:
+          severity: warning
+          service: loka-stratum
+          alert_type: slow_response
+        annotations:
+          summary: "Slow response times for {{ $labels.method }}"
+          description: "95th percentile response time is {{ $value }}s for {{ $labels.method }}"
+
+      # High concurrent connections
+      - alert: HighConnectionCount
+        expr: |
+          loka_stratum_active_connections > 800
+        for: 5m
+        labels:
+          severity: warning
+          service: loka-stratum
+          alert_type: high_connections
+        annotations:
+          summary: "High number of active connections"
+          description: "{{ $value }} active connections (threshold: 800)"
+
+      # Message queue backup
+      - alert: MessageQueueBackup
+        expr: |
+          loka_stratum_message_queue_size > 1000
+        for: 2m
+        labels:
+          severity: critical
+          service: loka-stratum  
+          alert_type: queue_backup
+        annotations:
+          summary: "Message queue is backing up"
+          description: "{{ $value }} messages queued (threshold: 1000)"
+
+  - name: loka-stratum-health
+    interval: 60s
+    rules:
+      # Service unavailable
+      - alert: ServiceUnavailable
+        expr: |
+          up{job="loka-stratum"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: loka-stratum
+          alert_type: service_down
+        annotations:
+          summary: "Loka Stratum service is down"
+          description: "Loka Stratum proxy service is not responding"
+
+      # Mining pool disconnected
+      - alert: PoolDisconnected
+        expr: |
+          loka_stratum_pool_connected == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: loka-stratum
+          alert_type: pool_disconnected
+        annotations:
+          summary: "Mining pool disconnected"
+          description: "Connection to mining pool has been lost"
+
+      # Low hashrate
+      - alert: LowHashrate
+        expr: |
+          loka_stratum_total_hashrate_hash_per_sec < 1000000
+        for: 10m
+        labels:
+          severity: warning
+          service: loka-stratum
+          alert_type: low_hashrate
+        annotations:
+          summary: "Total hashrate is low"
+          description: "Current hashrate: {{ $value | humanize }}H/s (threshold: 1MH/s)"

@@ -1,0 +1,42 @@
+# Example Loka Stratum configuration with Sentry integration
+# Copy to loka-stratum.toml and configure for your environment
+
+[server]
+bind_address = "0.0.0.0:3333"
+max_connections = 1000
+idle_timeout = 300            # 5 minutes in seconds
+
+[pool]
+id = "550e8400-e29b-41d4-a716-446655440000" # UUID for the pool
+address = "pool.example.com:4444"
+name = "Example Pool"
+username = "your_bitcoin_address_here"
+password = "optional_password"
+separator = [".", "_"]                      # Separators for username overrides
+extranonce = false
+
+[limiter]
+connections = 1000
+jobs = 600           # Job expiration: 10 minutes in seconds
+submissions = 172800 # Submission cleanup: 2 days in seconds
+
+[database]
+url = "postgresql://username:password@localhost:5432/loka_stratum"
+
+# Optional: Sentry error tracking and performance monitoring
+[sentry]
+dsn = "https://your-sentry-dsn@sentry.io/project-id"
+environment = "production"                           # or "staging", "development"
+sample_rate = 1.0                                    # Error sampling rate (0.0 to 1.0)
+traces_sample_rate = 1.0                             # Performance transaction sampling rate
+debug = false                                        # Enable debug mode for troubleshooting
+release = "loka-stratum@1.0.0"                       # Release version identifier
+max_breadcrumbs = 100                                # Maximum breadcrumbs to keep
+attach_stacktrace = true                             # Attach stack traces to messages
+enable_filtering = true                              # Enable sensitive data filtering
+
+# Alternative: Configure via environment variables
+# SENTRY_DSN=https://your-sentry-dsn@sentry.io/project-id
+# SENTRY_ENVIRONMENT=production
+# SENTRY_SAMPLE_RATE=1.0
+# SENTRY_TRACES_SAMPLE_RATE=1.0

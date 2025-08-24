@@ -1,0 +1,1 @@
+# This file makes /etc/sentry a Python package

@@ -241,3 +241,7 @@ The **Loka Stratum** refactoring has been **100% successful**, transforming the 
 **Deployment**: ✅ **READY FOR PRODUCTION**  
 **Performance**: ✅ **BENCHMARK-VALIDATED**  
 **Future**: 🔮 **ARCHITECTURE READY FOR ENHANCEMENTS**
+
+## Task Master AI Instructions
+**Import Task Master's development workflow commands and guidelines, treat as if import is in the main CLAUDE.md file.**
+@./.taskmaster/CLAUDE.md

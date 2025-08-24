@@ -9,6 +9,7 @@ use crate::entities::pools;
 use crate::{Error, Result, ValidationError};
 
 impl pools::Model {
+    #[allow(clippy::too_many_arguments)]
     #[tracing::instrument(skip(db))]
     pub async fn store(
         db: &impl ConnectionTrait,
