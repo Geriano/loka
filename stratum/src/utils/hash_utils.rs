@@ -49,17 +49,21 @@ impl HashUtils {
     /// Calculate hashrate using Bitcoin mining standard formula
     /// Formula: Hashrate = (Shares × Difficulty × 2^32) / Time_Window_Seconds
     /// Returns hashrate in H/s (hashes per second)
-    pub fn calculate_hashrate_bitcoin_standard(shares: u64, time_window_seconds: u64, difficulty: f64) -> f64 {
+    pub fn calculate_hashrate_bitcoin_standard(
+        shares: u64,
+        time_window_seconds: u64,
+        difficulty: f64,
+    ) -> f64 {
         if time_window_seconds == 0 || shares == 0 {
             return 0.0;
         }
 
         // Bitcoin standard: Each share represents difficulty * 2^32 hashes
         const HASHES_PER_SHARE_UNIT: f64 = 4_294_967_296.0; // 2^32
-        
+
         let hashes_per_share = difficulty * HASHES_PER_SHARE_UNIT;
         let total_hashes = shares as f64 * hashes_per_share;
-        
+
         total_hashes / time_window_seconds as f64
     }
 
@@ -272,22 +276,33 @@ mod tests {
     fn test_bitcoin_hashrate_calculation() {
         // Test case: 10 shares in 60 seconds at difficulty 1.0
         let hashrate = HashUtils::calculate_hashrate_bitcoin_standard(10, 60, 1.0);
-        
+
         // Expected: (10 × 1.0 × 2^32) / 60 = 715,827,882.67 H/s
         let expected = (10.0 * 1.0 * 4_294_967_296.0) / 60.0;
-        assert!((hashrate - expected).abs() < 1.0, "Expected: {}, Got: {}", expected, hashrate);
-        
+        assert!(
+            (hashrate - expected).abs() < 1.0,
+            "Expected: {}, Got: {}",
+            expected,
+            hashrate
+        );
+
         // Test edge cases
-        assert_eq!(HashUtils::calculate_hashrate_bitcoin_standard(0, 60, 1.0), 0.0);
-        assert_eq!(HashUtils::calculate_hashrate_bitcoin_standard(10, 0, 1.0), 0.0);
-        
+        assert_eq!(
+            HashUtils::calculate_hashrate_bitcoin_standard(0, 60, 1.0),
+            0.0
+        );
+        assert_eq!(
+            HashUtils::calculate_hashrate_bitcoin_standard(10, 0, 1.0),
+            0.0
+        );
+
         // Test higher difficulty
         let high_diff_hashrate = HashUtils::calculate_hashrate_bitcoin_standard(5, 30, 1000.0);
         let expected_high = (5.0 * 1000.0 * 4_294_967_296.0) / 30.0;
         assert!((high_diff_hashrate - expected_high).abs() < 1.0);
     }
 
-    #[test] 
+    #[test]
     fn test_hash_rate_calculation_legacy() {
         let hash_rate = HashUtils::calculate_hash_rate_optimized(10, 60, 1.0);
         assert!(hash_rate > 0);

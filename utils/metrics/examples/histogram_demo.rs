@@ -45,9 +45,7 @@ fn main() {
         let slot = calculate_slot(*value, histogram.lower(), histogram.upper());
         let range_start = slot as f64 * 10.0;
         let range_end = (slot + 1) as f64 * 10.0;
-        println!(
-            "Value {value:>6.1} → Slot {slot:>2} [{range_start:>6.1}, {range_end:<6.1})"
-        );
+        println!("Value {value:>6.1} → Slot {slot:>2} [{range_start:>6.1}, {range_end:<6.1})");
     }
 
     // Run benchmarks

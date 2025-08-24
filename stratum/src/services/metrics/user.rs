@@ -5,8 +5,8 @@
 
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::SystemTime;
 use tracing::debug;
 
@@ -22,12 +22,12 @@ use tracing::debug;
 /// use std::sync::Arc;
 ///
 /// let user_metrics = Arc::new(UserMetrics::new());
-/// 
+///
 /// // Record user activity
 /// user_metrics.record_connection("miner1");
 /// user_metrics.record_submission("miner1", true);
 /// user_metrics.record_bytes("miner1", 1024, 2048);
-/// 
+///
 /// // Get user snapshot
 /// let snapshot = user_metrics.get_user_snapshot("miner1");
 /// println!("Miner1 connections: {}", snapshot.total_connections);
@@ -76,7 +76,7 @@ impl UserMetrics {
     ///
     /// ```rust
     /// use loka_stratum::services::metrics::UserMetrics;
-    /// 
+    ///
     /// let user_metrics = UserMetrics::new();
     /// ```
     pub fn new() -> Self {
@@ -103,7 +103,7 @@ impl UserMetrics {
         data.total_connections.fetch_add(1, Ordering::Relaxed);
         data.active_connections.fetch_add(1, Ordering::Relaxed);
         self.update_last_seen(user_id);
-        
+
         debug!(user_id = user_id, "Recorded user connection");
     }
 
@@ -116,7 +116,7 @@ impl UserMetrics {
         let data = self.get_or_create_user_data(user_id);
         data.active_connections.fetch_sub(1, Ordering::Relaxed);
         self.update_last_seen(user_id);
-        
+
         debug!(user_id = user_id, "Recorded user disconnection");
     }
 
@@ -143,15 +143,15 @@ impl UserMetrics {
     pub fn record_submission(&self, user_id: &str, accepted: bool) {
         let data = self.get_or_create_user_data(user_id);
         data.total_submissions.fetch_add(1, Ordering::Relaxed);
-        
+
         if accepted {
             data.accepted_submissions.fetch_add(1, Ordering::Relaxed);
         } else {
             data.rejected_submissions.fetch_add(1, Ordering::Relaxed);
         }
-        
+
         self.update_last_seen(user_id);
-        
+
         debug!(
             user_id = user_id,
             accepted = accepted,
@@ -168,11 +168,11 @@ impl UserMetrics {
     pub fn record_auth(&self, user_id: &str, success: bool) {
         let data = self.get_or_create_user_data(user_id);
         data.auth_attempts.fetch_add(1, Ordering::Relaxed);
-        
+
         if success {
             data.auth_successes.fetch_add(1, Ordering::Relaxed);
         }
-        
+
         self.update_last_seen(user_id);
     }
 
@@ -232,7 +232,10 @@ impl UserMetrics {
 
     /// Get a list of all tracked user IDs.
     pub fn get_all_users(&self) -> Vec<String> {
-        self.user_data.iter().map(|entry| entry.key().clone()).collect()
+        self.user_data
+            .iter()
+            .map(|entry| entry.key().clone())
+            .collect()
     }
 
     /// Get the number of currently tracked users.
@@ -249,7 +252,7 @@ impl UserMetrics {
                     .duration_since(SystemTime::UNIX_EPOCH)
                     .unwrap_or_default()
                     .as_secs();
-                    
+
                 Arc::new(UserMetricsData {
                     total_connections: AtomicU64::new(0),
                     active_connections: AtomicU64::new(0),

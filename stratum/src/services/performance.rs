@@ -138,13 +138,19 @@ impl ResourceMonitor {
         let cpu_history = self.cpu_usage_history.read().await;
         let memory_history = self.memory_usage_history.read().await;
 
-        let peak_cpu = cpu_history.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).copied().unwrap_or(0.0) as f64;
-        let peak_memory = memory_history.iter().max().copied().unwrap_or(0) as f64 / (1024.0 * 1024.0); // Convert to MB
+        let peak_cpu = cpu_history
+            .iter()
+            .max_by(|a, b| a.partial_cmp(b).unwrap())
+            .copied()
+            .unwrap_or(0.0) as f64;
+        let peak_memory =
+            memory_history.iter().max().copied().unwrap_or(0) as f64 / (1024.0 * 1024.0); // Convert to MB
 
         ResourceUtilizationSummary {
             current_memory_mb: metrics.memory_used as f64 / (1024.0 * 1024.0), // Convert bytes to MB
             peak_memory_mb: peak_memory,
-            available_memory_mb: (metrics.memory_total - metrics.memory_used) as f64 / (1024.0 * 1024.0),
+            available_memory_mb: (metrics.memory_total - metrics.memory_used) as f64
+                / (1024.0 * 1024.0),
             connection_memory_bytes: 0, // Would need to track this separately
             current_cpu_percent: metrics.cpu_usage as f64,
             peak_cpu_percent: peak_cpu,
@@ -322,10 +328,7 @@ impl OperationTimer {
     pub async fn finish(self) -> Duration {
         let duration = self.start_time.elapsed();
 
-        let mut operation_times = self
-            .times_store
-            .entry(self.operation.clone())
-            .or_default();
+        let mut operation_times = self.times_store.entry(self.operation.clone()).or_default();
 
         operation_times.push(duration);
         if operation_times.len() > self.max_samples {

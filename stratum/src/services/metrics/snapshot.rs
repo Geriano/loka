@@ -32,14 +32,14 @@ use super::calculated::CalculatedMetrics;
 /// let snapshot = MetricsSnapshot::from_atomic(&metrics);
 ///
 /// println!("Active connections: {}", snapshot.active_connections);
-/// println!("Connection success rate: {:.2}%", 
+/// println!("Connection success rate: {:.2}%",
 ///          snapshot.calculate_metrics().connection_success_rate * 100.0);
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MetricsSnapshot {
     /// Timestamp when this snapshot was taken
     pub timestamp: SystemTime,
-    
+
     // === CONNECTION METRICS ===
     /// Total connections since startup
     pub total_connections: u64,
@@ -261,7 +261,9 @@ impl MetricsSnapshot {
 
         let avg_job_latency = {
             let sum = load_f64(&metrics.job_distribution_latency_sum_ms_bits);
-            let count = metrics.job_distribution_latency_count.load(Ordering::Relaxed);
+            let count = metrics
+                .job_distribution_latency_count
+                .load(Ordering::Relaxed);
             if count > 0 { sum / count as f64 } else { 0.0 }
         };
 
@@ -273,13 +275,17 @@ impl MetricsSnapshot {
 
         let protocol_conversion_rate = {
             let sum = load_f64(&metrics.protocol_conversion_success_rate_sum_bits);
-            let count = metrics.protocol_conversion_success_count.load(Ordering::Relaxed);
+            let count = metrics
+                .protocol_conversion_success_count
+                .load(Ordering::Relaxed);
             if count > 0 { sum / count as f64 } else { 0.0 }
         };
 
         let avg_memory_per_conn = {
             let sum = load_f64(&metrics.memory_usage_per_connection_sum_bits);
-            let count = metrics.memory_usage_per_connection_count.load(Ordering::Relaxed);
+            let count = metrics
+                .memory_usage_per_connection_count
+                .load(Ordering::Relaxed);
             if count > 0 { sum / count as f64 } else { 0.0 }
         };
 
@@ -343,15 +349,23 @@ impl MetricsSnapshot {
                 if min == f64::MAX { 0.0 } else { min }
             },
             idle_time_ms: load_f64(&metrics.idle_time_gauge_ms_bits),
-            reconnection_attempts: metrics.reconnection_attempts_counter.load(Ordering::Relaxed),
-            connections_established: metrics.connection_established_counter.load(Ordering::Relaxed),
+            reconnection_attempts: metrics
+                .reconnection_attempts_counter
+                .load(Ordering::Relaxed),
+            connections_established: metrics
+                .connection_established_counter
+                .load(Ordering::Relaxed),
             connections_closed: metrics.connection_closed_counter.load(Ordering::Relaxed),
 
             // Protocol detection metrics
             http_requests: metrics.http_requests_total.load(Ordering::Relaxed),
             stratum_requests: metrics.stratum_requests_total.load(Ordering::Relaxed),
-            protocol_detection_failures: metrics.protocol_detection_failures.load(Ordering::Relaxed),
-            protocol_detection_successes: metrics.protocol_detection_successes.load(Ordering::Relaxed),
+            protocol_detection_failures: metrics
+                .protocol_detection_failures
+                .load(Ordering::Relaxed),
+            protocol_detection_successes: metrics
+                .protocol_detection_successes
+                .load(Ordering::Relaxed),
             protocol_conversion_success_rate: protocol_conversion_rate,
             protocol_conversion_errors: metrics.protocol_conversion_errors.load(Ordering::Relaxed),
             http_connect_requests: metrics.http_connect_requests.load(Ordering::Relaxed),
@@ -360,9 +374,13 @@ impl MetricsSnapshot {
             // Mining operation metrics
             share_submissions: metrics.share_submissions_total.load(Ordering::Relaxed),
             share_acceptance_rate,
-            difficulty_adjustments_count: metrics.difficulty_adjustments_counter.load(Ordering::Relaxed),
+            difficulty_adjustments_count: metrics
+                .difficulty_adjustments_counter
+                .load(Ordering::Relaxed),
             avg_job_distribution_latency_ms: avg_job_latency,
-            max_job_distribution_latency_ms: load_f64(&metrics.job_distribution_latency_max_ms_bits),
+            max_job_distribution_latency_ms: load_f64(
+                &metrics.job_distribution_latency_max_ms_bits,
+            ),
             min_job_distribution_latency_ms: {
                 let min = load_f64(&metrics.job_distribution_latency_min_ms_bits);
                 if min == f64::MAX { 0.0 } else { min }
@@ -375,27 +393,41 @@ impl MetricsSnapshot {
             // Populate alias fields with the same data
             share_submissions_total: metrics.share_submissions_total.load(Ordering::Relaxed),
             share_acceptance_avg_rate: share_acceptance_rate,
-            difficulty_adjustments_counter: metrics.difficulty_adjustments_counter.load(Ordering::Relaxed),
+            difficulty_adjustments_counter: metrics
+                .difficulty_adjustments_counter
+                .load(Ordering::Relaxed),
             job_distribution_latency_avg_ms: avg_job_latency,
             job_distribution_latency_min_ms: {
                 let min = load_f64(&metrics.job_distribution_latency_min_ms_bits);
                 if min == f64::MAX { 0.0 } else { min }
             },
-            job_distribution_latency_max_ms: load_f64(&metrics.job_distribution_latency_max_ms_bits),
+            job_distribution_latency_max_ms: load_f64(
+                &metrics.job_distribution_latency_max_ms_bits,
+            ),
             stale_shares_counter: metrics.stale_shares_counter.load(Ordering::Relaxed),
             duplicate_shares_counter: metrics.duplicate_shares_counter.load(Ordering::Relaxed),
             shares_per_minute_gauge: metrics.shares_per_minute_gauge.load(Ordering::Relaxed),
 
             // Error categorization metrics
             network_errors: metrics.network_errors_total.load(Ordering::Relaxed),
-            authentication_failures: metrics.authentication_failures_total.load(Ordering::Relaxed),
+            authentication_failures: metrics
+                .authentication_failures_total
+                .load(Ordering::Relaxed),
             timeout_errors: metrics.timeout_errors_total.load(Ordering::Relaxed),
             protocol_parse_errors: metrics.protocol_parse_errors_total.load(Ordering::Relaxed),
-            protocol_version_errors: metrics.protocol_version_errors_total.load(Ordering::Relaxed),
-            protocol_message_errors: metrics.protocol_message_errors_total.load(Ordering::Relaxed),
+            protocol_version_errors: metrics
+                .protocol_version_errors_total
+                .load(Ordering::Relaxed),
+            protocol_message_errors: metrics
+                .protocol_message_errors_total
+                .load(Ordering::Relaxed),
             validation_errors: metrics.validation_errors_total.load(Ordering::Relaxed),
-            security_violation_errors: metrics.security_violation_errors_total.load(Ordering::Relaxed),
-            resource_exhaustion_errors: metrics.resource_exhaustion_errors_total.load(Ordering::Relaxed),
+            security_violation_errors: metrics
+                .security_violation_errors_total
+                .load(Ordering::Relaxed),
+            resource_exhaustion_errors: metrics
+                .resource_exhaustion_errors_total
+                .load(Ordering::Relaxed),
             internal_errors: metrics.internal_errors_total.load(Ordering::Relaxed),
 
             // Resource utilization metrics
@@ -406,9 +438,15 @@ impl MetricsSnapshot {
                 if min == f64::MAX { 0.0 } else { min }
             },
             cpu_utilization: load_f64(&metrics.cpu_utilization_sample_bits),
-            network_bandwidth_rx_bps: metrics.network_bandwidth_rx_bytes_per_sec.load(Ordering::Relaxed),
-            network_bandwidth_tx_bps: metrics.network_bandwidth_tx_bytes_per_sec.load(Ordering::Relaxed),
-            connection_memory_total: metrics.connection_memory_total_bytes.load(Ordering::Relaxed),
+            network_bandwidth_rx_bps: metrics
+                .network_bandwidth_rx_bytes_per_sec
+                .load(Ordering::Relaxed),
+            network_bandwidth_tx_bps: metrics
+                .network_bandwidth_tx_bytes_per_sec
+                .load(Ordering::Relaxed),
+            connection_memory_total: metrics
+                .connection_memory_total_bytes
+                .load(Ordering::Relaxed),
             connection_memory_peak: metrics.connection_memory_peak_bytes.load(Ordering::Relaxed),
             resource_pressure_events: metrics.resource_pressure_events.load(Ordering::Relaxed),
             memory_efficiency_ratio: load_f64(&metrics.memory_efficiency_ratio_bits),
@@ -443,14 +481,17 @@ impl MetricsSnapshot {
     /// and the provided baseline.
     pub fn delta_from(&self, baseline: &MetricsSnapshot) -> MetricsDelta {
         MetricsDelta {
-            duration: self.timestamp.duration_since(baseline.timestamp)
+            duration: self
+                .timestamp
+                .duration_since(baseline.timestamp)
                 .unwrap_or(Duration::ZERO),
-            
+
             connections_delta: self.total_connections as i64 - baseline.total_connections as i64,
             messages_delta: self.messages_received as i64 - baseline.messages_received as i64,
             bytes_received_delta: self.bytes_received as i64 - baseline.bytes_received as i64,
             bytes_sent_delta: self.bytes_sent as i64 - baseline.bytes_sent as i64,
-            submissions_delta: self.submissions_received as i64 - baseline.submissions_received as i64,
+            submissions_delta: self.submissions_received as i64
+                - baseline.submissions_received as i64,
             accepted_delta: self.submissions_accepted as i64 - baseline.submissions_accepted as i64,
             rejected_delta: self.submissions_rejected as i64 - baseline.submissions_rejected as i64,
             errors_delta: self.protocol_errors as i64 - baseline.protocol_errors as i64,
@@ -464,61 +505,103 @@ impl MetricsSnapshot {
         // Connection metrics
         output.push_str("# HELP stratum_connections_total Total number of connections\n");
         output.push_str("# TYPE stratum_connections_total counter\n");
-        output.push_str(&format!("stratum_connections_total {}\n", self.total_connections));
-        
+        output.push_str(&format!(
+            "stratum_connections_total {}\n",
+            self.total_connections
+        ));
+
         output.push_str("# HELP stratum_connections_active Current active connections\n");
         output.push_str("# TYPE stratum_connections_active gauge\n");
-        output.push_str(&format!("stratum_connections_active {}\n", self.active_connections));
+        output.push_str(&format!(
+            "stratum_connections_active {}\n",
+            self.active_connections
+        ));
 
         // Protocol metrics
         output.push_str("# HELP stratum_messages_received_total Messages received\n");
         output.push_str("# TYPE stratum_messages_received_total counter\n");
-        output.push_str(&format!("stratum_messages_received_total {}\n", self.messages_received));
+        output.push_str(&format!(
+            "stratum_messages_received_total {}\n",
+            self.messages_received
+        ));
 
         output.push_str("# HELP stratum_bytes_received_total Bytes received\n");
         output.push_str("# TYPE stratum_bytes_received_total counter\n");
-        output.push_str(&format!("stratum_bytes_received_total {}\n", self.bytes_received));
+        output.push_str(&format!(
+            "stratum_bytes_received_total {}\n",
+            self.bytes_received
+        ));
 
         // Mining metrics
         output.push_str("# HELP stratum_shares_submitted_total Shares submitted\n");
         output.push_str("# TYPE stratum_shares_submitted_total counter\n");
-        output.push_str(&format!("stratum_shares_submitted_total {}\n", self.share_submissions));
+        output.push_str(&format!(
+            "stratum_shares_submitted_total {}\n",
+            self.share_submissions
+        ));
 
         output.push_str("# HELP stratum_shares_accepted_total Shares accepted\n");
         output.push_str("# TYPE stratum_shares_accepted_total counter\n");
-        output.push_str(&format!("stratum_shares_accepted_total {}\n", self.submissions_accepted));
+        output.push_str(&format!(
+            "stratum_shares_accepted_total {}\n",
+            self.submissions_accepted
+        ));
 
         output.push_str("# HELP stratum_share_acceptance_rate Share acceptance rate\n");
         output.push_str("# TYPE stratum_share_acceptance_rate gauge\n");
-        output.push_str(&format!("stratum_share_acceptance_rate {:.4}\n", self.share_acceptance_rate));
+        output.push_str(&format!(
+            "stratum_share_acceptance_rate {:.4}\n",
+            self.share_acceptance_rate
+        ));
 
         // Hashrate metrics
         output.push_str("# HELP stratum_hashrate_estimate_hs Estimated hashrate in H/s\n");
         output.push_str("# TYPE stratum_hashrate_estimate_hs gauge\n");
-        output.push_str(&format!("stratum_hashrate_estimate_hs {:.2}\n", self.hashrate_estimate));
+        output.push_str(&format!(
+            "stratum_hashrate_estimate_hs {:.2}\n",
+            self.hashrate_estimate
+        ));
 
         output.push_str("# HELP stratum_hashrate_estimate_mhs Estimated hashrate in MH/s\n");
         output.push_str("# TYPE stratum_hashrate_estimate_mhs gauge\n");
-        output.push_str(&format!("stratum_hashrate_estimate_mhs {:.4}\n", self.hashrate_estimate / 1_000_000.0));
+        output.push_str(&format!(
+            "stratum_hashrate_estimate_mhs {:.4}\n",
+            self.hashrate_estimate / 1_000_000.0
+        ));
 
         output.push_str("# HELP stratum_difficulty_current Current mining difficulty\n");
         output.push_str("# TYPE stratum_difficulty_current gauge\n");
-        output.push_str(&format!("stratum_difficulty_current {:.6}\n", self.current_difficulty));
+        output.push_str(&format!(
+            "stratum_difficulty_current {:.6}\n",
+            self.current_difficulty
+        ));
 
         // Performance metrics
         output.push_str("# HELP stratum_response_time_ms Response time in milliseconds\n");
         output.push_str("# TYPE stratum_response_time_ms summary\n");
-        output.push_str(&format!("stratum_response_time_ms{{quantile=\"0.5\"}} {:.2}\n", self.avg_response_time_ms));
-        output.push_str(&format!("stratum_response_time_ms{{quantile=\"1.0\"}} {:.2}\n", self.max_response_time_ms));
+        output.push_str(&format!(
+            "stratum_response_time_ms{{quantile=\"0.5\"}} {:.2}\n",
+            self.avg_response_time_ms
+        ));
+        output.push_str(&format!(
+            "stratum_response_time_ms{{quantile=\"1.0\"}} {:.2}\n",
+            self.max_response_time_ms
+        ));
 
         // Resource metrics
         output.push_str("# HELP stratum_memory_usage_bytes Memory usage\n");
         output.push_str("# TYPE stratum_memory_usage_bytes gauge\n");
-        output.push_str(&format!("stratum_memory_usage_bytes {}\n", self.memory_usage_bytes));
+        output.push_str(&format!(
+            "stratum_memory_usage_bytes {}\n",
+            self.memory_usage_bytes
+        ));
 
         output.push_str("# HELP stratum_cpu_usage_percent CPU usage percentage\n");
         output.push_str("# TYPE stratum_cpu_usage_percent gauge\n");
-        output.push_str(&format!("stratum_cpu_usage_percent {:.2}\n", self.cpu_usage_percent));
+        output.push_str(&format!(
+            "stratum_cpu_usage_percent {:.2}\n",
+            self.cpu_usage_percent
+        ));
 
         output
     }
@@ -529,7 +612,7 @@ impl MetricsSnapshot {
 pub struct MetricsDelta {
     /// Time duration between snapshots
     pub duration: Duration,
-    
+
     /// Change in total connections
     pub connections_delta: i64,
     /// Change in messages received

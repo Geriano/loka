@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// let snapshot = MetricsSnapshot::default();
 /// let calculated = snapshot.calculated_metrics();
-/// 
+///
 /// println!("Connection success rate: {:.2}%", calculated.connection_success_rate * 100.0);
 /// println!("Auth success rate: {:.2}%", calculated.auth_success_rate * 100.0);
 /// ```
@@ -102,31 +102,35 @@ impl CalculatedMetrics {
     pub fn from_snapshot(snapshot: &super::MetricsSnapshot) -> Self {
         // Helper function for safe division
         let safe_divide = |numerator: f64, denominator: f64| -> f64 {
-            if denominator == 0.0 { 0.0 } else { numerator / denominator }
+            if denominator == 0.0 {
+                0.0
+            } else {
+                numerator / denominator
+            }
         };
 
         // Connection success rate
         let connection_success_rate = safe_divide(
             (snapshot.total_connections - snapshot.connection_errors) as f64,
-            snapshot.total_connections as f64
+            snapshot.total_connections as f64,
         );
 
         // Authentication success rate
         let auth_success_rate = safe_divide(
             snapshot.auth_successes as f64,
-            snapshot.auth_attempts as f64
+            snapshot.auth_attempts as f64,
         );
 
         // Share acceptance rate
         let share_acceptance_rate = safe_divide(
             snapshot.submissions_accepted as f64,
-            snapshot.submissions_received as f64
+            snapshot.submissions_received as f64,
         );
 
         // Protocol error rate
         let protocol_error_rate = safe_divide(
             snapshot.protocol_errors as f64,
-            snapshot.messages_received as f64
+            snapshot.messages_received as f64,
         );
 
         // Throughput calculations (would need time duration for accurate per-second rates)
@@ -137,18 +141,20 @@ impl CalculatedMetrics {
         // Job processing efficiency
         let job_processing_efficiency = safe_divide(
             snapshot.jobs_processed as f64,
-            snapshot.jobs_received as f64
+            snapshot.jobs_received as f64,
         );
 
         // Security violations per connection
         let security_violations_per_connection = safe_divide(
             snapshot.security_violations as f64,
-            snapshot.total_connections as f64
+            snapshot.total_connections as f64,
         );
 
         // Memory usage per connection (convert bytes to MB)
         let memory_usage_per_connection = if snapshot.active_connections > 0 {
-            (snapshot.memory_usage_bytes as f64) / (1024.0 * 1024.0) / (snapshot.active_connections as f64)
+            (snapshot.memory_usage_bytes as f64)
+                / (1024.0 * 1024.0)
+                / (snapshot.active_connections as f64)
         } else {
             0.0
         };
@@ -163,37 +169,37 @@ impl CalculatedMetrics {
         // Connection uptime efficiency
         let connection_uptime_efficiency = safe_divide(
             snapshot.connections_established as f64,
-            (snapshot.connections_established + snapshot.reconnection_attempts) as f64
+            (snapshot.connections_established + snapshot.reconnection_attempts) as f64,
         );
 
         // Reconnection rate
         let reconnection_rate = safe_divide(
             snapshot.reconnection_attempts as f64,
-            snapshot.active_connections as f64
+            snapshot.active_connections as f64,
         );
 
         // Protocol detection accuracy
         let protocol_detection_accuracy = safe_divide(
             snapshot.protocol_detection_successes as f64,
-            (snapshot.protocol_detection_successes + snapshot.protocol_detection_failures) as f64
+            (snapshot.protocol_detection_successes + snapshot.protocol_detection_failures) as f64,
         );
 
         // HTTP vs Stratum traffic ratio
         let http_stratum_traffic_ratio = safe_divide(
             snapshot.http_requests as f64,
-            (snapshot.http_requests + snapshot.stratum_requests) as f64
+            (snapshot.http_requests + snapshot.stratum_requests) as f64,
         );
 
         // Shares per minute per connection
         let shares_per_minute_per_connection = safe_divide(
             snapshot.shares_per_minute as f64,
-            snapshot.active_connections as f64
+            snapshot.active_connections as f64,
         );
 
         // Stale share percentage
         let stale_share_percentage = safe_divide(
             snapshot.stale_shares as f64,
-            snapshot.share_submissions as f64
+            snapshot.share_submissions as f64,
         );
 
         // Job distribution efficiency (based on latency)
@@ -211,8 +217,9 @@ impl CalculatedMetrics {
         };
 
         // Network bandwidth total in Mbps
-        let network_bandwidth_total_mbps = 
-            ((snapshot.network_bandwidth_rx_bps + snapshot.network_bandwidth_tx_bps) as f64 * 8.0) / (1024.0 * 1024.0);
+        let network_bandwidth_total_mbps =
+            ((snapshot.network_bandwidth_rx_bps + snapshot.network_bandwidth_tx_bps) as f64 * 8.0)
+                / (1024.0 * 1024.0);
 
         // CPU health score (inverse of utilization)
         let cpu_utilization_health_score = (100.0 - snapshot.cpu_utilization) / 100.0;
@@ -220,22 +227,21 @@ impl CalculatedMetrics {
         // Resource pressure rate
         let resource_pressure_rate = safe_divide(
             snapshot.resource_pressure_events as f64,
-            snapshot.total_connections as f64
+            snapshot.total_connections as f64,
         );
 
         // Memory usage variance per connection
-        let memory_usage_per_connection_variance = 
+        let memory_usage_per_connection_variance =
             snapshot.max_memory_per_connection_mb - snapshot.min_memory_per_connection_mb;
 
         // Overall system efficiency score (weighted average of key metrics)
-        let system_efficiency_score = (
-            connection_success_rate * 0.2 +
-            auth_success_rate * 0.15 +
-            share_acceptance_rate * 0.25 +
-            job_processing_efficiency * 0.2 +
-            response_time_health_score * 0.1 +
-            cpu_utilization_health_score * 0.1
-        ).min(1.0);
+        let system_efficiency_score = (connection_success_rate * 0.2
+            + auth_success_rate * 0.15
+            + share_acceptance_rate * 0.25
+            + job_processing_efficiency * 0.2
+            + response_time_health_score * 0.1
+            + cpu_utilization_health_score * 0.1)
+            .min(1.0);
 
         Self {
             connection_success_rate,

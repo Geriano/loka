@@ -2,7 +2,7 @@
 //
 // Provides comprehensive validation for Bitcoin addresses including:
 // - Legacy addresses (P2PKH, P2SH)
-// - SegWit addresses (P2WPKH, P2WSH) 
+// - SegWit addresses (P2WPKH, P2WSH)
 // - Taproot addresses (P2TR)
 // - Worker name format validation (address.worker_name)
 
@@ -182,7 +182,7 @@ impl BitcoinAddressValidator {
     fn validate_base58_address(&self, address: &str) -> Result<(), String> {
         // Check character set (Base58: no 0, O, I, l)
         const BASE58_CHARS: &str = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-        
+
         for ch in address.chars() {
             if !BASE58_CHARS.contains(ch) {
                 return Err(format!("Invalid Base58 character: {ch}"));
@@ -204,7 +204,7 @@ impl BitcoinAddressValidator {
     fn validate_bech32_address(&self, address: &str) -> Result<(), String> {
         // Check character set (Bech32: lowercase letters and numbers, no 1, b, i, o)
         const BECH32_CHARS: &str = "023456789acdefghjklmnpqrstuvwxyz";
-        
+
         // Split into HRP (Human Readable Part) and data
         if let Some(separator_pos) = address.rfind('1') {
             let hrp = &address[..separator_pos];
@@ -242,7 +242,9 @@ impl BitcoinAddressValidator {
             return false;
         }
 
-        worker_name.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-')
+        worker_name
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
     }
 
     /// Get a user-friendly description of the validation result
@@ -252,7 +254,10 @@ impl BitcoinAddressValidator {
                 format!("Valid {} address", self.describe_address_type(address_type))
             }
             AddressValidationResult::ValidWorkerFormat { address_type, .. } => {
-                format!("Valid worker format with {} address", self.describe_address_type(address_type))
+                format!(
+                    "Valid worker format with {} address",
+                    self.describe_address_type(address_type)
+                )
             }
             AddressValidationResult::Invalid { reason } => {
                 format!("Invalid: {reason}")
@@ -264,7 +269,7 @@ impl BitcoinAddressValidator {
     fn describe_address_type(&self, address_type: &BitcoinAddressType) -> &'static str {
         match address_type {
             BitcoinAddressType::P2PKH => "Legacy P2PKH",
-            BitcoinAddressType::P2SH => "Legacy P2SH", 
+            BitcoinAddressType::P2SH => "Legacy P2SH",
             BitcoinAddressType::P2WPKH => "SegWit P2WPKH",
             BitcoinAddressType::P2WSH => "SegWit P2WSH",
             BitcoinAddressType::P2TR => "Taproot P2TR",
@@ -289,11 +294,23 @@ mod tests {
 
         // Valid P2PKH address
         let result = validator.validate_address("1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa");
-        assert!(matches!(result, AddressValidationResult::Valid { address_type: BitcoinAddressType::P2PKH, .. }));
+        assert!(matches!(
+            result,
+            AddressValidationResult::Valid {
+                address_type: BitcoinAddressType::P2PKH,
+                ..
+            }
+        ));
 
         // Valid P2SH address
         let result = validator.validate_address("3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy");
-        assert!(matches!(result, AddressValidationResult::Valid { address_type: BitcoinAddressType::P2SH, .. }));
+        assert!(matches!(
+            result,
+            AddressValidationResult::Valid {
+                address_type: BitcoinAddressType::P2SH,
+                ..
+            }
+        ));
     }
 
     #[test]
@@ -302,11 +319,24 @@ mod tests {
 
         // Valid P2WPKH address (42 chars)
         let result = validator.validate_address("bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4");
-        assert!(matches!(result, AddressValidationResult::Valid { address_type: BitcoinAddressType::P2WPKH, .. }));
+        assert!(matches!(
+            result,
+            AddressValidationResult::Valid {
+                address_type: BitcoinAddressType::P2WPKH,
+                ..
+            }
+        ));
 
         // Valid P2TR address
-        let result = validator.validate_address("bc1p5cyxnuxmeuwuvkwfem96lqzszd02n6xdcjrs20cac6yqjjwudpxqkedrcr");
-        assert!(matches!(result, AddressValidationResult::Valid { address_type: BitcoinAddressType::P2TR, .. }));
+        let result = validator
+            .validate_address("bc1p5cyxnuxmeuwuvkwfem96lqzszd02n6xdcjrs20cac6yqjjwudpxqkedrcr");
+        assert!(matches!(
+            result,
+            AddressValidationResult::Valid {
+                address_type: BitcoinAddressType::P2TR,
+                ..
+            }
+        ));
     }
 
     #[test]
@@ -315,11 +345,18 @@ mod tests {
 
         // Valid worker format with P2PKH address
         let result = validator.validate_address("1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa.worker1");
-        assert!(matches!(result, AddressValidationResult::ValidWorkerFormat { .. }));
+        assert!(matches!(
+            result,
+            AddressValidationResult::ValidWorkerFormat { .. }
+        ));
 
         // Valid worker format with SegWit address
-        let result = validator.validate_address("bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4.miner_01");
-        assert!(matches!(result, AddressValidationResult::ValidWorkerFormat { .. }));
+        let result =
+            validator.validate_address("bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4.miner_01");
+        assert!(matches!(
+            result,
+            AddressValidationResult::ValidWorkerFormat { .. }
+        ));
     }
 
     #[test]
@@ -349,6 +386,12 @@ mod tests {
         // With testnet enabled
         let validator_testnet = BitcoinAddressValidator::new(true);
         let result = validator_testnet.validate_address("n2ZNV88uQbede7C5M5jzi6SyC3tjMrbhLQ");
-        assert!(matches!(result, AddressValidationResult::Valid { address_type: BitcoinAddressType::Testnet, .. }));
+        assert!(matches!(
+            result,
+            AddressValidationResult::Valid {
+                address_type: BitcoinAddressType::Testnet,
+                ..
+            }
+        ));
     }
 }

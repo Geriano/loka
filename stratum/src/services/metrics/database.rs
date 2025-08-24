@@ -17,11 +17,11 @@ use std::time::{Duration, SystemTime};
 /// use loka_stratum::services::metrics::DatabaseMetrics;
 ///
 /// let mut db_metrics = DatabaseMetrics::default();
-/// 
+///
 /// // Record database operations
 /// db_metrics.record_query_execution(Duration::from_millis(15), true);
 /// db_metrics.record_connection_acquired(Duration::from_micros(500));
-/// 
+///
 /// println!("Query success rate: {:.2}%", db_metrics.query_success_rate() * 100.0);
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -98,24 +98,24 @@ impl DatabaseMetrics {
     /// * `success` - Whether the query executed successfully
     pub fn record_query_execution(&mut self, duration: Duration, success: bool) {
         self.queries_total += 1;
-        
+
         if success {
             self.queries_successful += 1;
         } else {
             self.queries_failed += 1;
         }
-        
+
         let duration_ms = duration.as_millis() as u64;
         self.query_duration_total_ms += duration_ms;
-        
+
         if self.query_duration_min_ms == 0 || duration_ms < self.query_duration_min_ms {
             self.query_duration_min_ms = duration_ms;
         }
-        
+
         if duration_ms > self.query_duration_max_ms {
             self.query_duration_max_ms = duration_ms;
         }
-        
+
         self.last_updated = SystemTime::now();
     }
 
@@ -166,7 +166,7 @@ impl DatabaseMetrics {
             "workers" => self.workers_inserted += count,
             "submissions" => self.submissions_inserted += count,
             "earnings" => self.earnings_inserted += count,
-            _ => {}, // Unknown table
+            _ => {} // Unknown table
         }
         self.last_updated = SystemTime::now();
     }
@@ -180,7 +180,7 @@ impl DatabaseMetrics {
     pub fn record_update(&mut self, table: &str, count: u64) {
         match table {
             "miners" => self.miners_updated += count,
-            _ => {}, // Other tables updates can be added as needed
+            _ => {} // Other tables updates can be added as needed
         }
         self.last_updated = SystemTime::now();
     }
@@ -195,11 +195,11 @@ impl DatabaseMetrics {
     pub fn update_pool_stats(&mut self, active: u64, idle: u64, max_reached: u64) {
         self.connections_active = active;
         self.connections_idle = idle;
-        
+
         if max_reached > self.connections_max_reached {
             self.connections_max_reached = max_reached;
         }
-        
+
         self.last_updated = SystemTime::now();
     }
 

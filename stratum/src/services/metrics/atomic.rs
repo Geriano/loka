@@ -127,7 +127,7 @@ pub struct AtomicMetrics {
     pub hashrate_window_start_timestamp_bits: AtomicU64,
     /// Share count at window start for hashrate calculation
     pub hashrate_window_start_shares: AtomicU64,
-    /// Current difficulty for hashrate calculation (stored as f64 bits) 
+    /// Current difficulty for hashrate calculation (stored as f64 bits)
     pub hashrate_current_difficulty_bits: AtomicU64,
 
     // === BUSINESS METRICS ===
@@ -449,14 +449,16 @@ impl AtomicMetrics {
     pub fn increment_connection(&self) {
         self.total_connections.fetch_add(1, Ordering::Relaxed);
         self.active_connections.fetch_add(1, Ordering::Relaxed);
-        self.connection_established_counter.fetch_add(1, Ordering::Relaxed);
+        self.connection_established_counter
+            .fetch_add(1, Ordering::Relaxed);
     }
 
     /// Decrement connection counter
     #[inline]
     pub fn decrement_connection(&self) {
         self.active_connections.fetch_sub(1, Ordering::Relaxed);
-        self.connection_closed_counter.fetch_add(1, Ordering::Relaxed);
+        self.connection_closed_counter
+            .fetch_add(1, Ordering::Relaxed);
     }
 
     /// Record bytes received
@@ -523,10 +525,10 @@ impl AtomicMetrics {
             self.auth_successes.fetch_add(1, Ordering::Relaxed);
         } else {
             self.auth_failures.fetch_add(1, Ordering::Relaxed);
-            self.authentication_failures_total.fetch_add(1, Ordering::Relaxed);
+            self.authentication_failures_total
+                .fetch_add(1, Ordering::Relaxed);
         }
     }
-
 
     /// Record successful authentication
     #[inline]
@@ -538,7 +540,8 @@ impl AtomicMetrics {
     #[inline]
     pub fn record_auth_failure(&self) {
         self.auth_failures.fetch_add(1, Ordering::Relaxed);
-        self.authentication_failures_total.fetch_add(1, Ordering::Relaxed);
+        self.authentication_failures_total
+            .fetch_add(1, Ordering::Relaxed);
     }
 
     /// Record protocol error by type
@@ -546,9 +549,15 @@ impl AtomicMetrics {
     pub fn record_protocol_error(&self, error_type: &str) {
         self.protocol_errors.fetch_add(1, Ordering::Relaxed);
         match error_type {
-            "parse" => self.protocol_parse_errors_total.fetch_add(1, Ordering::Relaxed),
-            "version" => self.protocol_version_errors_total.fetch_add(1, Ordering::Relaxed),
-            "message" => self.protocol_message_errors_total.fetch_add(1, Ordering::Relaxed),
+            "parse" => self
+                .protocol_parse_errors_total
+                .fetch_add(1, Ordering::Relaxed),
+            "version" => self
+                .protocol_version_errors_total
+                .fetch_add(1, Ordering::Relaxed),
+            "message" => self
+                .protocol_message_errors_total
+                .fetch_add(1, Ordering::Relaxed),
             _ => self.protocol_errors.fetch_add(1, Ordering::Relaxed),
         };
     }
@@ -577,7 +586,8 @@ impl AtomicMetrics {
     #[inline]
     pub fn record_security_violation(&self) {
         self.security_violations.fetch_add(1, Ordering::Relaxed);
-        self.security_violation_errors_total.fetch_add(1, Ordering::Relaxed);
+        self.security_violation_errors_total
+            .fetch_add(1, Ordering::Relaxed);
     }
 
     /// Record rate limit hit
@@ -599,9 +609,11 @@ impl AtomicMetrics {
     #[inline]
     pub fn update_active_connections(&self, delta: i64) {
         if delta > 0 {
-            self.active_connections.fetch_add(delta as u64, Ordering::Relaxed);
+            self.active_connections
+                .fetch_add(delta as u64, Ordering::Relaxed);
         } else {
-            self.active_connections.fetch_sub((-delta) as u64, Ordering::Relaxed);
+            self.active_connections
+                .fetch_sub((-delta) as u64, Ordering::Relaxed);
         }
     }
 
@@ -609,7 +621,8 @@ impl AtomicMetrics {
     #[inline]
     pub fn record_connection_duration(&self, duration_ms: f64) {
         self.add_f64(&self.connection_duration_sum_ms_bits, duration_ms);
-        self.connection_duration_count.fetch_add(1, Ordering::Relaxed);
+        self.connection_duration_count
+            .fetch_add(1, Ordering::Relaxed);
         self.update_max_f64(&self.connection_duration_max_ms_bits, duration_ms);
         self.update_min_f64(&self.connection_duration_min_ms_bits, duration_ms);
     }
@@ -618,7 +631,8 @@ impl AtomicMetrics {
     #[inline]
     pub fn record_job_distribution_latency(&self, latency_ms: f64) {
         self.add_f64(&self.job_distribution_latency_sum_ms_bits, latency_ms);
-        self.job_distribution_latency_count.fetch_add(1, Ordering::Relaxed);
+        self.job_distribution_latency_count
+            .fetch_add(1, Ordering::Relaxed);
         self.update_max_f64(&self.job_distribution_latency_max_ms_bits, latency_ms);
         self.update_min_f64(&self.job_distribution_latency_min_ms_bits, latency_ms);
     }
@@ -629,21 +643,24 @@ impl AtomicMetrics {
         self.store_f64(&self.current_difficulty_bits, difficulty);
         self.update_hashrate_difficulty(difficulty); // Also update hashrate calculation difficulty
         self.difficulty_adjustments.fetch_add(1, Ordering::Relaxed);
-        self.difficulty_adjustments_counter.fetch_add(1, Ordering::Relaxed);
+        self.difficulty_adjustments_counter
+            .fetch_add(1, Ordering::Relaxed);
     }
 
     /// Record share acceptance rate sample
     #[inline]
     pub fn record_share_acceptance_rate(&self, rate: f64) {
         self.add_f64(&self.share_acceptance_rate_sum_bits, rate);
-        self.share_acceptance_rate_count.fetch_add(1, Ordering::Relaxed);
+        self.share_acceptance_rate_count
+            .fetch_add(1, Ordering::Relaxed);
     }
 
     /// Update resource utilization metrics
     #[inline]
     pub fn update_resource_utilization(&self, memory_mb: f64, cpu_percent: f64) {
         let memory_bytes = (memory_mb * 1024.0 * 1024.0) as u64;
-        self.memory_usage_bytes.store(memory_bytes, Ordering::Relaxed);
+        self.memory_usage_bytes
+            .store(memory_bytes, Ordering::Relaxed);
         self.store_f64(&self.cpu_usage_percent_bits, cpu_percent);
         self.store_f64(&self.cpu_utilization_sample_bits, cpu_percent);
         self.cpu_sample_count.fetch_add(1, Ordering::Relaxed);
@@ -653,7 +670,8 @@ impl AtomicMetrics {
     #[inline]
     pub fn record_memory_per_connection(&self, memory_mb: f64) {
         self.add_f64(&self.memory_usage_per_connection_sum_bits, memory_mb);
-        self.memory_usage_per_connection_count.fetch_add(1, Ordering::Relaxed);
+        self.memory_usage_per_connection_count
+            .fetch_add(1, Ordering::Relaxed);
         self.update_max_f64(&self.memory_usage_per_connection_max_bits, memory_mb);
         self.update_min_f64(&self.memory_usage_per_connection_min_bits, memory_mb);
     }
@@ -661,8 +679,10 @@ impl AtomicMetrics {
     /// Update bandwidth metrics
     #[inline]
     pub fn update_bandwidth(&self, rx_bytes_per_sec: u64, tx_bytes_per_sec: u64) {
-        self.network_bandwidth_rx_bytes_per_sec.store(rx_bytes_per_sec, Ordering::Relaxed);
-        self.network_bandwidth_tx_bytes_per_sec.store(tx_bytes_per_sec, Ordering::Relaxed);
+        self.network_bandwidth_rx_bytes_per_sec
+            .store(rx_bytes_per_sec, Ordering::Relaxed);
+        self.network_bandwidth_tx_bytes_per_sec
+            .store(tx_bytes_per_sec, Ordering::Relaxed);
     }
 
     /// Update response time metrics with a new measurement.
@@ -677,8 +697,12 @@ impl AtomicMetrics {
     /// Record protocol conversion success with rate.
     #[inline]
     pub fn record_protocol_conversion_success(&self, success_rate: f64) {
-        self.protocol_detection_successes.fetch_add(1, Ordering::Relaxed);
-        self.store_f64(&self.protocol_conversion_success_rate_sum_bits, success_rate);
+        self.protocol_detection_successes
+            .fetch_add(1, Ordering::Relaxed);
+        self.store_f64(
+            &self.protocol_conversion_success_rate_sum_bits,
+            success_rate,
+        );
     }
 
     /// Record stale share.
@@ -690,7 +714,8 @@ impl AtomicMetrics {
     /// Record duplicate share.
     #[inline]
     pub fn record_duplicate_share(&self) {
-        self.duplicate_shares_counter.fetch_add(1, Ordering::Relaxed);
+        self.duplicate_shares_counter
+            .fetch_add(1, Ordering::Relaxed);
     }
 
     /// Update shares per minute.
@@ -751,47 +776,51 @@ impl AtomicMetrics {
     pub fn calculate_and_update_hashrate(&self, time_window_seconds: f64) {
         use crate::utils::hash_utils::HashUtils;
         use std::time::{SystemTime, UNIX_EPOCH};
-        
+
         let current_timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
             .as_secs_f64();
-            
+
         let window_start = self.load_f64(&self.hashrate_window_start_timestamp_bits);
         let current_shares = self.share_submissions_total.load(Ordering::Relaxed);
         let window_start_shares = self.hashrate_window_start_shares.load(Ordering::Relaxed);
         let difficulty = self.load_f64(&self.hashrate_current_difficulty_bits);
-        
+
         // Initialize window if not set or if enough time has passed
         if window_start == 0.0 || (current_timestamp - window_start) >= time_window_seconds {
             // Calculate hashrate for the completed window
             if window_start > 0.0 && current_shares > window_start_shares {
                 let shares_in_window = current_shares - window_start_shares;
                 let actual_time_window = current_timestamp - window_start;
-                
+
                 if actual_time_window > 0.0 {
                     let hashrate = HashUtils::calculate_hashrate_bitcoin_standard(
                         shares_in_window,
                         actual_time_window as u64,
-                        difficulty
+                        difficulty,
                     );
-                    
+
                     self.store_f64(&self.hashrate_estimate_bits, hashrate);
                 }
             }
-            
+
             // Reset window
-            self.store_f64(&self.hashrate_window_start_timestamp_bits, current_timestamp);
-            self.hashrate_window_start_shares.store(current_shares, Ordering::Relaxed);
+            self.store_f64(
+                &self.hashrate_window_start_timestamp_bits,
+                current_timestamp,
+            );
+            self.hashrate_window_start_shares
+                .store(current_shares, Ordering::Relaxed);
         }
     }
-    
+
     /// Update difficulty for hashrate calculations
     #[inline]
     pub fn update_hashrate_difficulty(&self, difficulty: f64) {
         self.store_f64(&self.hashrate_current_difficulty_bits, difficulty);
     }
-    
+
     /// Get current hashrate estimate
     #[inline]
     pub fn get_hashrate_estimate(&self) -> f64 {

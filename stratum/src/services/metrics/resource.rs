@@ -19,7 +19,7 @@ use std::time::SystemTime;
 /// let mut summary = ResourceUtilizationSummary::default();
 /// summary.update_memory(512.5, 1024.0);
 /// summary.update_cpu(25.3);
-/// 
+///
 /// println!("Memory efficiency: {:.2}", summary.memory_efficiency_ratio());
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -41,7 +41,7 @@ pub struct ResourceUtilizationSummary {
     pub peak_cpu_percent: f64,
     /// Number of CPU samples taken for averaging
     pub cpu_sample_count: u64,
-    
+
     // Network Metrics
     /// Current network receive rate in bytes per second
     pub network_rx_bps: u64,
@@ -91,11 +91,11 @@ impl ResourceUtilizationSummary {
     pub fn update_memory(&mut self, current_mb: f64, available_mb: f64) {
         self.current_memory_mb = current_mb;
         self.available_memory_mb = available_mb;
-        
+
         if current_mb > self.peak_memory_mb {
             self.peak_memory_mb = current_mb;
         }
-        
+
         self.last_updated = SystemTime::now();
     }
 
@@ -107,16 +107,16 @@ impl ResourceUtilizationSummary {
     pub fn update_cpu(&mut self, cpu_percent: f64) {
         self.current_cpu_percent = cpu_percent;
         self.cpu_sample_count += 1;
-        
+
         if cpu_percent > self.peak_cpu_percent {
             self.peak_cpu_percent = cpu_percent;
         }
-        
+
         // Check for resource pressure (high CPU usage)
         if cpu_percent > 90.0 {
             self.record_pressure_event();
         }
-        
+
         self.last_updated = SystemTime::now();
     }
 
@@ -129,15 +129,15 @@ impl ResourceUtilizationSummary {
     pub fn update_network(&mut self, rx_bps: u64, tx_bps: u64) {
         self.network_rx_bps = rx_bps;
         self.network_tx_bps = tx_bps;
-        
+
         if rx_bps > self.peak_network_rx_bps {
             self.peak_network_rx_bps = rx_bps;
         }
-        
+
         if tx_bps > self.peak_network_tx_bps {
             self.peak_network_tx_bps = tx_bps;
         }
-        
+
         self.last_updated = SystemTime::now();
     }
 
@@ -152,12 +152,13 @@ impl ResourceUtilizationSummary {
         self.load_avg_1min = load_1min;
         self.load_avg_5min = load_5min;
         self.load_avg_15min = load_15min;
-        
+
         // Check for resource pressure (high load)
-        if load_1min > 8.0 { // Assuming typical server with multiple cores
+        if load_1min > 8.0 {
+            // Assuming typical server with multiple cores
             self.record_pressure_event();
         }
-        
+
         self.last_updated = SystemTime::now();
     }
 
@@ -169,12 +170,12 @@ impl ResourceUtilizationSummary {
     pub fn update_connection_memory(&mut self, connections: u64) {
         if connections > 0 {
             self.memory_per_connection_mb = self.current_memory_mb / connections as f64;
-            
+
             if self.memory_per_connection_mb > self.peak_memory_per_connection_mb {
                 self.peak_memory_per_connection_mb = self.memory_per_connection_mb;
             }
         }
-        
+
         self.last_updated = SystemTime::now();
     }
 
@@ -271,7 +272,7 @@ impl ResourceUtilizationSummary {
         } else {
             1.0
         };
-        
+
         // Weighted average of different health indicators
         (cpu_score * 0.4 + memory_score * 0.4 + load_score * 0.2).min(1.0)
     }

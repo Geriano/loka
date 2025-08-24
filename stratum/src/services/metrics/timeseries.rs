@@ -19,11 +19,11 @@ use tracing::debug;
 /// use std::time::Duration;
 ///
 /// let mut ts = TimeSeriesMetrics::new(Duration::from_secs(60), 100);
-/// 
+///
 /// // Record data points
 /// ts.record_metric("connection_count", 150.0);
 /// ts.record_metric("message_rate", 1200.5);
-/// 
+///
 /// // Get moving averages
 /// if let Some(avg) = ts.get_moving_average("connection_count", 10) {
 ///     println!("Average connections over last 10 samples: {:.2}", avg);
@@ -82,19 +82,17 @@ impl TimeSeriesMetrics {
     /// ```
     pub fn record_metric(&mut self, metric_name: &str, value: f64) {
         let now = SystemTime::now();
-        
-        let data = self.data_points
-            .entry(metric_name.to_string())
-            .or_default();
-            
+
+        let data = self.data_points.entry(metric_name.to_string()).or_default();
+
         // Add new data point
         data.push_back((now, value));
-        
+
         // Remove old data points beyond window or max samples - need to handle borrowing
         let window_duration = self.window_duration;
         let max_samples = self.max_samples;
         Self::cleanup_old_data_static(data, window_duration, max_samples);
-        
+
         debug!(
             metric = metric_name,
             value = value,
@@ -128,17 +126,18 @@ impl TimeSeriesMetrics {
     /// ```
     pub fn get_moving_average(&self, metric_name: &str, sample_count: usize) -> Option<f64> {
         let data = self.data_points.get(metric_name)?;
-        
+
         if data.len() < sample_count {
             return None;
         }
-        
-        let sum: f64 = data.iter()
+
+        let sum: f64 = data
+            .iter()
             .rev()
             .take(sample_count)
             .map(|(_, value)| value)
             .sum();
-            
+
         Some(sum / sample_count as f64)
     }
 
@@ -171,34 +170,41 @@ impl TimeSeriesMetrics {
     /// zero for stable, None if insufficient data.
     pub fn get_trend(&self, metric_name: &str, sample_count: usize) -> Option<f64> {
         let data = self.data_points.get(metric_name)?;
-        
+
         if data.len() < sample_count.max(2) {
             return None;
         }
-        
-        let recent: Vec<f64> = data.iter()
+
+        let recent: Vec<f64> = data
+            .iter()
             .rev()
             .take(sample_count)
             .map(|(_, value)| *value)
             .collect();
-            
+
         if recent.len() < 2 {
             return None;
         }
-        
+
         // Simple linear trend calculation
-        let first_half_avg = recent[recent.len()/2..].iter().sum::<f64>() / (recent.len()/2) as f64;
-        let second_half_avg = recent[..recent.len()/2].iter().sum::<f64>() / (recent.len()/2) as f64;
-        
+        let first_half_avg =
+            recent[recent.len() / 2..].iter().sum::<f64>() / (recent.len() / 2) as f64;
+        let second_half_avg =
+            recent[..recent.len() / 2].iter().sum::<f64>() / (recent.len() / 2) as f64;
+
         Some(first_half_avg - second_half_avg)
     }
 
     /// Clean up old data points beyond window duration or max samples (static version).
-    fn cleanup_old_data_static(data: &mut VecDeque<(SystemTime, f64)>, window_duration: Duration, max_samples: usize) {
+    fn cleanup_old_data_static(
+        data: &mut VecDeque<(SystemTime, f64)>,
+        window_duration: Duration,
+        max_samples: usize,
+    ) {
         let cutoff_time = SystemTime::now()
             .checked_sub(window_duration)
             .unwrap_or(SystemTime::UNIX_EPOCH);
-            
+
         // Remove points older than window duration
         while let Some((timestamp, _)) = data.front() {
             if *timestamp < cutoff_time {
@@ -207,7 +213,7 @@ impl TimeSeriesMetrics {
                 break;
             }
         }
-        
+
         // Remove excess points beyond max samples
         while data.len() > max_samples {
             data.pop_front();

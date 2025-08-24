@@ -99,9 +99,7 @@ fn test_value(histogram: &Histogram, value: f64, description: &str) {
     println!("  {description}: ");
     println!("    Original value: {original_value:.1}");
     println!("    Clamped value: {clamped:.1}");
-    println!(
-        "    Goes to slot: {slot} [{slot_range_start:.1}, {slot_range_end:.1})"
-    );
+    println!("    Goes to slot: {slot} [{slot_range_start:.1}, {slot_range_end:.1})");
 
     if original_value != clamped {
         println!("    ⚠️  Value was clamped!");

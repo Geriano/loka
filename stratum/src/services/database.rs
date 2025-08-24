@@ -173,9 +173,7 @@ impl DatabaseService {
             .one(&self.connection)
             .await
             .map_err(|e| crate::error::StratumError::Database {
-                message: format!(
-                    "Failed to fetch pool config by target {host}:{port}: {e}"
-                ),
+                message: format!("Failed to fetch pool config by target {host}:{port}: {e}"),
                 source: Some(Box::new(e)),
             })?;
 

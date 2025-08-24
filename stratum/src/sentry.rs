@@ -8,7 +8,8 @@ use crate::config::SentryConfig;
 /// Initialize Sentry with configuration from environment variables or config
 pub fn init_sentry(config: Option<&SentryConfig>) -> Result<Option<sentry::ClientInitGuard>> {
     // Try to get DSN from config first, then environment variable
-    let dsn = config.map(|c| c.dsn.clone())
+    let dsn = config
+        .map(|c| c.dsn.clone())
         .or_else(|| env::var("SENTRY_DSN").ok())
         .filter(|dsn| !dsn.is_empty());
 
