@@ -492,7 +492,7 @@ jobs:
       - name: Start monitoring stack
         run: |
           cd monitoring
-          docker-compose up -d
+          docker compose up -d
           
           # Wait for services to be ready
           sleep 30
@@ -500,7 +500,7 @@ jobs:
       - name: Start Loka Stratum
         run: |
           cd stratum
-          docker-compose up -d
+          docker compose up -d
           
           # Wait for application startup
           sleep 30
