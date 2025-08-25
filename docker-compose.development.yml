@@ -49,8 +49,7 @@ services:
     restart: unless-stopped
     ports:
       - "3333:3333"
-    expose:
-      - "9090"
+      - "127.0.0.1:9090:9090"
     environment:
       - DATABASE_URL=postgres://root:root@host.docker.internal:5432/loka
       - RUST_LOG=trace
