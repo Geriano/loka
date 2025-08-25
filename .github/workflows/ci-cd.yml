@@ -491,6 +491,7 @@ jobs:
 
       - name: Start stack
         run: |
+          docker compose -f docker-compose.development.yml down || true
           docker compose -f docker-compose.development.yml up -d
           
           # Wait for services to be ready
@@ -508,16 +509,14 @@ jobs:
       - name: Collect logs on failure
         if: failure()
         run: |
-          echo "=== Loka Stratum Logs ==="
-          cd stratum && docker-compose logs
+          echo "=== Loka Logs ==="
           echo "=== Monitoring Stack Logs ==="
-          cd monitoring && docker-compose logs
+          docker compose -f docker-compose.development.yml logs
 
       - name: Cleanup
         if: always()
         run: |
-          cd stratum && docker-compose down -v
-          cd monitoring && docker-compose down -v
+          docker compose -f docker-compose.development.yml down -v
 
   # Job 11: Notification
   notify:
