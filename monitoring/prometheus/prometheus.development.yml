@@ -9,12 +9,6 @@ global:
 rule_files:
   - "rules/*.yml"
 
-alerting:
-  alertmanagers:
-    - static_configs:
-        - targets:
-            - alertmanager:9093
-
 scrape_configs:
   # Prometheus itself
   - job_name: "prometheus"
@@ -47,14 +41,6 @@ scrape_configs:
       format: ["prometheus"]
     sample_limit: 10000 # Higher limit for development testing
 
-  # Loka Stratum health check disabled - endpoint returns JSON, not Prometheus format
-  # - job_name: "loka-stratum-health"
-  #   static_configs:
-  #     - targets: ["stratum:9090"]
-  #   scrape_interval: 10s
-  #   metrics_path: /health
-  #   scrape_timeout: 3s
-
   # Node Exporter (system metrics) - Development
   - job_name: "node-exporter"
     static_configs:
@@ -69,13 +55,6 @@ scrape_configs:
       - targets: ["cadvisor:8080"]
     scrape_interval: 15s # Faster for development
     scrape_timeout: 10s
-    metrics_path: /metrics
-
-  # AlertManager - Development
-  - job_name: "alertmanager"
-    static_configs:
-      - targets: ["alertmanager:9093"]
-    scrape_interval: 15s
     metrics_path: /metrics
 
   # Grafana - Development

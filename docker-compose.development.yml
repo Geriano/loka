@@ -10,16 +10,16 @@ services:
       - POSTGRES_DB=loka
     volumes:
       - postgres-dev-data:/var/lib/postgresql/data
-      - ./monitoring/postgres/init-dev.sql:/docker-entrypoint-initdb.d/init-dev.sql:ro
-    ports:
+    expose:
       - "5432"
     networks:
       - loka-dev-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U root"]
+      test: ["CMD-SHELL", "pg_isready -U root -d loka"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
     cpus: 0.5
 
   # Redis for Development Caching
@@ -29,12 +29,12 @@ services:
     command: redis-server --appendonly yes
     volumes:
       - redis-dev-data:/data
-    ports:
-      - "6379:6379"
+    expose:
+      - "6379"
     networks:
       - loka-dev-network
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "redis-cli", "ping"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -49,10 +49,11 @@ services:
     restart: unless-stopped
     ports:
       - "3333:3333"
-      - "9090:9090"
+    expose:
+      - "9090"
     environment:
       - DATABASE_URL=postgres://root:root@host.docker.internal:5432/loka
-      - RUST_LOG=debug
+      - RUST_LOG=trace
       - RUST_BACKTRACE=full
       - ENV=development
     volumes:
@@ -66,19 +67,49 @@ services:
     command: ["loka-stratum", "start"]
     networks:
       - loka-dev-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/health"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9090/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 60s
+      start_period: 10s
     labels:
       - "prometheus.io/scrape=true"
       - "prometheus.io/port=9090"
       - "prometheus.io/path=/metrics/prometheus"
+  
+  # Nginx proxy
+  proxy:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - loka-dev-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      stratum:
+        condition: service_healthy
+      grafana:
+        condition: service_healthy
+      prometheus:
+        condition: service_healthy
+      cadvisor:
+        condition: service_healthy
+      loki:
+        condition: service_healthy
+      error-tracker:
+        condition: service_healthy
 
   # Development Monitoring Stack
   prometheus:
@@ -93,9 +124,9 @@ services:
       - '--web.console.templates=/etc/prometheus/consoles'
       - '--web.enable-lifecycle'
       - '--web.enable-admin-api'
-      - '--log.level=debug'
-    ports:
-      - "9091:9090"
+      - '--log.level=info'
+    expose:
+      - "9090"
     volumes:
       - ./monitoring/prometheus/prometheus.development.yml:/etc/prometheus/prometheus.yml:ro
       - ./monitoring/prometheus/rules:/etc/prometheus/rules:ro
@@ -103,13 +134,14 @@ services:
     networks:
       - loka-dev-network
     depends_on:
-      - stratum
+      stratum:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
       interval: 30s
       timeout: 10s
       retries: 3
-    cpus: 0.5
+    # cpus: 0.5
 
   # Development Grafana
   grafana:
@@ -117,14 +149,20 @@ services:
     restart: unless-stopped
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin123
-      - GF_USERS_ALLOW_SIGN_UP=true
+      - GF_USERS_ALLOW_SIGN_UP=false
       - GF_USERS_ALLOW_ORG_CREATE=true
       - GF_ANALYTICS_REPORTING_ENABLED=false
       - GF_ANALYTICS_CHECK_FOR_UPDATES=false
       - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
       - GF_LOG_LEVEL=debug
-    ports:
-      - "3001:3000"
+      - GF_RENDERING_SERVER_URL=http://proxy:8000/grafana-renderer/
+      - GF_SERVER_ROOT_URL=http://localhost:8000/grafana/
+      - GF_SERVER_SERVE_FROM_SUB_PATH=false
+      - GF_SECURITY_CSRF_ENABLED=false
+      - GF_SECURITY_CSRF_TRUSTED_ORIGINS=*
+      - GF_SECURITY_CSRF_ADDITIONAL_HEADERS=*
+    expose:
+      - "3000"
     volumes:
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
@@ -138,50 +176,33 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 60s
     cpus: 0.5
     
   grafana-renderer:
     image: grafana/grafana-image-renderer:3.8.0
     restart: unless-stopped
+    expose:
+      - "8081"
     environment:
       - ENABLE_METRICS=true
       - HTTP_PORT=8081
     networks:
       - loka-dev-network
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8081/"]
+      test: ["CMD-SHELL", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8081/"]
       interval: 30s
       timeout: 10s
       retries: 3
-    cpus: 0.5
-  alertmanager:
-    image: prom/alertmanager:v0.26.0
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:0:9093"
-    command:
-      - '--config.file=/etc/alertmanager/alertmanager.yml'
-      - '--storage.path=/alertmanager'
-      - '--web.external-url=http://localhost:9093'
-      - '--cluster.advertise-address=0.0.0.0:9093'
-    volumes:
-      - ./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
-      - alertmanager-data:/alertmanager
-    networks:
-      - loka-dev-network
-    healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9093/-/healthy"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      start_period: 60s
     cpus: 0.5
 
   # Node Exporter (system metrics)
   node-exporter:
     image: prom/node-exporter:v1.6.1
     restart: unless-stopped
-    ports:
-      - "127.0.0.1:0:9100"
+    expose:
+      - "9100"
     command:
       - '--path.procfs=/host/proc'
       - '--path.sysfs=/host/sys'
@@ -194,18 +215,19 @@ services:
     networks:
       - loka-dev-network
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9100/"]
+      test: ["CMD-SHELL", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9100/"]
       interval: 60s
       timeout: 5s
       retries: 3
+      start_period: 60s
     cpus: 0.5
 
   # cAdvisor (container metrics)
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:v0.47.2
     restart: unless-stopped
-    ports:
-      - "127.0.0.1:0:8080"
+    expose:
+      - "8080"
     volumes:
       - /:/rootfs:ro
       - /var/run:/var/run:ro
@@ -228,8 +250,8 @@ services:
   loki:
     image: grafana/loki:2.9.0
     restart: unless-stopped
-    ports:
-      - "127.0.0.1:0:3100"
+    expose:
+      - "3100"
     command: -config.file=/etc/loki/local-config.yaml
     volumes:
       - ./monitoring/loki/loki-config.yaml:/etc/loki/local-config.yaml:ro
@@ -265,8 +287,8 @@ services:
   error-tracker:
     image: prom/pushgateway:v1.6.2
     restart: unless-stopped
-    ports:
-      - "127.0.0.1:0:9091"
+    expose:
+      - "9091"
     networks:
       - loka-dev-network
     healthcheck:
@@ -275,41 +297,6 @@ services:
       timeout: 10s
       retries: 3
     cpus: 0.5
-
-  # Development Tools Container
-  dev-tools:
-    image: alpine/curl:latest
-    restart: "no"
-    command: sleep 3600
-    networks:
-      - loka-dev-network
-    volumes:
-      - ./scripts:/scripts:ro
-    profiles: ["tools"]
-
-  # Load Testing Container (Optional)
-  load-tester:
-    image: alpine/curl:latest
-    restart: "no"
-    command: |
-      sh -c '
-        echo "Starting load test..."
-        for i in $$(seq 1 100); do
-          curl -X POST http://stratum:3333 \
-            -H "Content-Type: application/json" \
-            -d "{\"id\":$$i,\"method\":\"mining.authorize\",\"params\":[\"test.worker$$i\",\"password\"]}" &
-          if [ $$((i % 10)) -eq 0 ]; then
-            sleep 1
-          fi
-        done
-        wait
-        echo "Load test complete"
-      '
-    networks:
-      - loka-dev-network
-    depends_on:
-      - stratum
-    profiles: ["load-test"]
 
 volumes:
   postgres-dev-data:
@@ -323,8 +310,6 @@ volumes:
   prometheus-data:
     driver: local
   grafana-data:
-    driver: local
-  alertmanager-data:
     driver: local
   loki-data:
     driver: local

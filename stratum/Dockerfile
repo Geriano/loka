@@ -38,7 +38,8 @@ RUN apk add --no-cache \
     vim \
     strace \
     gdb \
-    procps
+    procps \
+    wget
 
 # Create a non-root user
 RUN addgroup -g 1001 -S loka && \
@@ -96,6 +97,7 @@ RUN apk add --no-cache \
     tzdata \
     tini \
     curl \
+    wget \
     vim
 
 # Create a non-root user
