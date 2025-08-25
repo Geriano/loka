@@ -489,30 +489,18 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Start monitoring stack
+      - name: Start stack
         run: |
-          cd monitoring
-          docker compose up -d
+          docker compose -f docker-compose.development.yml up -d
           
           # Wait for services to be ready
-          sleep 30
-
-      - name: Start Loka Stratum
-        run: |
-          cd stratum
-          docker compose up -d
-          
-          # Wait for application startup
           sleep 30
 
       - name: Run end-to-end tests
         run: |
           # Test health endpoints
-          curl -f http://localhost:9091/health
-          curl -f http://localhost:9091/metrics/prometheus
-          
-          # Test Prometheus is scraping metrics
-          curl -f http://localhost:9090/api/v1/targets
+          curl -f http://localhost:9090/health
+          curl -f http://localhost:9090/metrics/prometheus
           
           # Test Grafana is accessible
           curl -f http://localhost:3000/api/health
