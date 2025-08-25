@@ -237,6 +237,14 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Login to Internal Docker Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.INTERNAL_DOCKER_DOMAIN }}
+          username: ${{ secrets.INTERNAL_DOCKER_USERNAME }}
+          password: ${{ secrets.INTERNAL_DOCKER_PASSWORD }}
+
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
@@ -244,6 +252,7 @@ jobs:
           images: |
             ghcr.io/${{ github.repository }}/loka-stratum
             ${{ secrets.DOCKERHUB_USERNAME }}/loka-stratum
+            ${{ secrets.INTERNAL_DOCKER_DOMAIN }}/loka-stratum
           tags: |
             type=ref,event=branch
             type=ref,event=pr

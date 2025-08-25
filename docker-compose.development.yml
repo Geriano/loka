@@ -55,12 +55,12 @@ services:
       - ENV=development
     volumes:
       - ./stratum/config:/app/config:ro
-      - stratum-data:/app/data
-      - stratum-logs:/app/logs
       # Mount source for hot-reload development
       - ./stratum/src:/workspace/stratum/src:ro
       - ./model/src:/workspace/model/src:ro
       - ./utils/metrics/src:/workspace/utils/metrics/src:ro
+      - stratum-data:/app/data
+      - stratum-logs:/app/logs
     command: ["loka-stratum", "start"]
     networks:
       - loka-dev-network
@@ -135,6 +135,135 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    
+  grafana-renderer:
+    image: grafana/grafana-image-renderer:3.8.0
+    restart: unless-stopped
+    environment:
+      - ENABLE_METRICS=true
+      - HTTP_PORT=8081
+    networks:
+      - loka-dev-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8081/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+  alertmanager:
+    image: prom/alertmanager:v0.26.0
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:0:9093"
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+      - '--web.external-url=http://localhost:9093'
+      - '--cluster.advertise-address=0.0.0.0:9093'
+    volumes:
+      - ./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+    networks:
+      - loka-dev-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9093/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Node Exporter (system metrics)
+  node-exporter:
+    image: prom/node-exporter:v1.6.1
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:0:9100"
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/rootfs'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    networks:
+      - loka-dev-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9100/"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+
+  # cAdvisor (container metrics)
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.47.2
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:0:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    devices:
+      - /dev/kmsg
+    privileged: true
+    networks:
+      - loka-dev-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Loki for log aggregation (alternative to Sentry)
+  loki:
+    image: grafana/loki:2.9.0
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:0:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./monitoring/loki/loki-config.yaml:/etc/loki/local-config.yaml:ro
+      - loki-data:/loki
+    environment:
+      - LOKI_DATA_PATH=/loki
+    user: "10001:10001"
+    networks:
+      - loka-dev-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3100/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Promtail for log collection
+  promtail:
+    image: grafana/promtail:2.9.0
+    restart: unless-stopped
+    command: -config.file=/etc/promtail/config.yml
+    volumes:
+      - ./monitoring/loki/promtail-config.yaml:/etc/promtail/config.yml:ro
+      - /var/log:/var/log:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    networks:
+      - loka-dev-network
+    depends_on:
+      - loki
+
+  # Error tracking service using Prometheus Pushgateway
+  error-tracker:
+    image: prom/pushgateway:v1.6.2
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:0:9091"
+    networks:
+      - loka-dev-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9091/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # Development Tools Container
   dev-tools:
@@ -183,6 +312,10 @@ volumes:
   prometheus-data:
     driver: local
   grafana-data:
+    driver: local
+  alertmanager-data:
+    driver: local
+  loki-data:
     driver: local
 
 networks:
