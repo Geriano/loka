@@ -20,6 +20,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    cpus: 0.5
 
   # Redis for Development Caching
   redis:
@@ -37,6 +38,7 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
+    cpus: 0.5
 
   # Loka Stratum Development Build
   stratum:
@@ -107,6 +109,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    cpus: 0.5
 
   # Development Grafana
   grafana:
@@ -135,6 +138,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    cpus: 0.5
     
   grafana-renderer:
     image: grafana/grafana-image-renderer:3.8.0
@@ -149,6 +153,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    cpus: 0.5
   alertmanager:
     image: prom/alertmanager:v0.26.0
     restart: unless-stopped
@@ -169,6 +174,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    cpus: 0.5
 
   # Node Exporter (system metrics)
   node-exporter:
@@ -192,6 +198,7 @@ services:
       interval: 60s
       timeout: 5s
       retries: 3
+    cpus: 0.5
 
   # cAdvisor (container metrics)
   cadvisor:
@@ -215,6 +222,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    cpus: 0.5
 
   # Loki for log aggregation (alternative to Sentry)
   loki:
@@ -236,6 +244,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    cpus: 0.5
 
   # Promtail for log collection
   promtail:
@@ -250,6 +259,7 @@ services:
       - loka-dev-network
     depends_on:
       - loki
+    cpus: 0.5
 
   # Error tracking service using Prometheus Pushgateway
   error-tracker:
@@ -264,6 +274,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    cpus: 0.5
 
   # Development Tools Container
   dev-tools:
